@@ -1,0 +1,15 @@
+# 이 파일은 예시입니다. 비밀번호, access key, 실제 계정 ID를 넣지 마세요.
+# 필요한 개인 설정은 terraform.tfvars (Git ignore 대상) 또는 환경 변수로 전달하세요.
+
+aws_region = "ap-northeast-2"
+
+# 실제 팀 IAM Identity Center 역할 ARN과 권한 정책 ARN으로 채웁니다.
+# 예: map key = 운영자 식별자, role_arn = 팀에서 만든 역할 ARN
+operator_access_entries = {
+  # platform_admin = {
+  #   role_arn   = "arn:aws:iam::<ACCOUNT_ID>:role/<TEAM_ROLE_NAME>"
+  #   policy_arn = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+  #   scope_type = "cluster"
+  #   run_as_user = "platform-admin"
+  # }
+}

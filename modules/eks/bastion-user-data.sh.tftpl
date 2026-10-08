@@ -1,0 +1,34 @@
+#!/bin/bash
+set -euo pipefail
+
+# Bastion은 Private subnet에 있고 NAT를 통해 패키지 저장소에 연결합니다.
+# SSM Agent는 Amazon Linux 2023 이미지에 포함되어 있습니다.
+dnf install -y awscli-2 curl
+
+KUBECTL_VERSION="v${cluster_version}.0"
+curl --fail --silent --show-error --location \
+  "https://dl.k8s.io/release/$${KUBECTL_VERSION}/bin/linux/amd64/kubectl" \
+  --output /usr/local/bin/kubectl
+chmod 0755 /usr/local/bin/kubectl
+
+install -d -m 0755 /opt/sai
+cat > /etc/profile.d/sai-eks.sh <<'PROFILE'
+export AWS_REGION="${aws_region}"
+export KUBECONFIG="$HOME/.kube/config"
+PROFILE
+chmod 0644 /etc/profile.d/sai-eks.sh
+
+# Session Manager RunAs user names are mapped from the external operator roles.
+OPERATOR_USERS='${operator_users}'
+printf '%s' "$OPERATOR_USERS" | python3 -c '
+import json
+import pwd
+import subprocess
+import sys
+
+for username in json.load(sys.stdin):
+    try:
+        pwd.getpwnam(username)
+    except KeyError:
+        subprocess.run(["useradd", "--create-home", "--shell", "/bin/bash", username], check=True)
+'

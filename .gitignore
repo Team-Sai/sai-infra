@@ -1,9 +1,22 @@
 # Local .terraform directories
 .terraform/
+.idea/
+
+# Local secrets and environment files
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+*.pfx
+*.key
 
 # .tfstate files
 *.tfstate
 *.tfstate.*
+*.tfplan
+*.plan
+*.plan.json
 
 # Crash log files
 crash.log
