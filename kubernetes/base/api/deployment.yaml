@@ -1,0 +1,70 @@
+# 백엔드(Spring Boot) - 로컬/AWS 공통
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sai-api
+  labels:
+    app: sai-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sai-api
+  template:
+    metadata:
+      labels:
+        app: sai-api
+    spec:
+      # 종료 신호 후 최대 45초 기다림 (Spring의 정상 종료 30초 + 여유)
+      terminationGracePeriodSeconds: 45
+      containers:
+        - name: api
+          image: sai-backend          # 태그(local / ECR 주소)는 overlay가 정함
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            # 컨테이너 메모리 한도의 75%까지 Java가 쓰게 함 (기본값은 25%라 너무 적음)
+            - name: JAVA_TOOL_OPTIONS
+              value: "-XX:MaxRAMPercentage=75"
+          volumeMounts:
+            # Secret(sai-api-config)의 yml 파일을 /app/config/ 에 꽂음
+            - name: app-config
+              mountPath: /app/config
+              readOnly: true
+          resources:
+            requests:
+              cpu: 250m
+              memory: 768Mi
+            limits:
+              memory: 1Gi
+          # 1) 켜지는 중: 최대 3분(5초 x 36번) 기다려 줌. 이동안은 아래 두 검사를 안 함
+          startupProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: http
+            periodSeconds: 5
+            failureThreshold: 36
+          # 2) 손님 받을 준비됐니? 아니면 Service가 이 Pod로 요청을 안 보냄
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: http
+            periodSeconds: 10
+            failureThreshold: 3
+          # 3) 살아 있니? 30초간 대답 없으면 재시작
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: http
+            periodSeconds: 10
+            failureThreshold: 3
+          lifecycle:
+            # 종료 직전 5초 대기: 입구가 "이 Pod 빼기"를 반영할 시간을 줌
+            preStop:
+              exec:
+                command: ["sleep", "5"]
+      volumes:
+        - name: app-config
+          secret:
+            secretName: sai-api-config
