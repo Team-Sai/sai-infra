@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sai-api
+spec:
+  template:
+    spec:
+      serviceAccountName: sai-api              # 3번 신분증 → S3 권한
+      terminationGracePeriodSeconds: 60
+      # 노드가 여러 대가 되면 백엔드를 서로 다른 노드에 나눠 배치 (지금 1대라 영향 없음)
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: sai-api
+      containers:
+        - name: api
+          env:
+            - name: SPRING_PROFILES_ACTIVE     # → application-prod.yml 사용 (#8에서 준비)
+              value: prod
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sleep", "15"]       # ALB에서 빠지는 시간이 kind보다 길어서 5초 → 15초

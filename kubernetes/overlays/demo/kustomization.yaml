@@ -1,0 +1,34 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: sai
+
+resources:
+  - ../../base
+  - namespace.yaml
+  - serviceaccount.yaml
+  - pdb.yaml
+  - ingress.yaml
+
+# ⚠️ 빈칸: terraform output의 ECR 주소와, ECR에 올린 이미지 태그로 바꾸기
+images:
+  - name: sai-backend
+    newName: 000000000000.dkr.ecr.ap-northeast-2.amazonaws.com/sai-backend
+    newTag: change-me
+  - name: sai-frontend
+    newName: 000000000000.dkr.ecr.ap-northeast-2.amazonaws.com/sai-frontend
+    newTag: change-me
+
+# 워커 노드 t3.large 1대 기준. t3.medium이면 sai-api를 1로
+replicas:
+  - name: sai-api
+    count: 2
+  - name: sai-web
+    count: 2
+
+patches:
+  - path: api-demo-patch.yaml
+  - path: service-api-patch.yaml
+  - path: service-web-patch.yaml
+  # HTTPS 준비되면(도메인 + ACM 인증서) 아래 주석을 풀기
+  # - path: ingress-https-patch.yaml
