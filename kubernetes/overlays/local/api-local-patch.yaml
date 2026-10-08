@@ -1,0 +1,32 @@
+# base의 sai-api에 "로컬에서는 이렇게 연결해" 를 덧붙임
+# Spring은 환경 변수를 yml보다 우선하므로 yml의 localhost 주소를 덮어씀
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sai-api
+spec:
+  template:
+    spec:
+      containers:
+        - name: api
+          env:
+            - name: SPRING_PROFILES_ACTIVE          # → application-dev.yml 사용
+              value: dev
+            - name: SPRING_DATASOURCE_URL           # spring.datasource.url
+              value: jdbc:mariadb://mariadb:3306/sai_backend
+            - name: SPRING_DATASOURCE_USERNAME
+              value: root
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: sai-local-db
+                  key: MARIADB_ROOT_PASSWORD
+            - name: SPRING_DATA_REDIS_HOST          # spring.data.redis.host
+              value: redis
+            - name: SPRING_DATA_REDIS_PORT
+              value: "6379"
+            - name: SPRING_DATA_REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: sai-local-db
+                  key: REDIS_PASSWORD

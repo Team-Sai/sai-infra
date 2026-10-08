@@ -1,0 +1,31 @@
+# A안: /api, /accounts/link/callback → 백엔드 / 나머지 전부 → 프론트(Nginx)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: sai
+spec:
+  ingressClassName: traefik       # AWS(demo)에서는 alb 로 바뀜
+  rules:
+    - http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: sai-api
+                port:
+                  number: 8080
+          - path: /accounts/link/callback
+            pathType: Prefix
+            backend:
+              service:
+                name: sai-api
+                port:
+                  number: 8080
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: sai-web
+                port:
+                  number: 80
