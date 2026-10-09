@@ -19,7 +19,8 @@ images:
     newName: 000000000000.dkr.ecr.ap-northeast-2.amazonaws.com/sai-frontend
     newTag: change-me
 
-# 워커 노드 t3.large 1대 기준. t3.medium이면 sai-api를 1로
+# 워커 노드: AZ별 t3.medium 1대씩, 총 2대 기준 (PR #10 Terraform 구성)
+# api·web 각 2개 → AZ마다 1개씩 배치되어 한 AZ 장애에도 서비스 유지
 replicas:
   - name: sai-api
     count: 2
@@ -30,5 +31,7 @@ patches:
   - path: api-demo-patch.yaml
   - path: service-api-patch.yaml
   - path: service-web-patch.yaml
-  # HTTPS 준비되면(도메인 + ACM 인증서) 아래 주석을 풀기
+  - path: web-demo-patch.yaml
+  # ⚠️ HTTPS 적용 전(HTTP 80만 열린 상태)에는 실제 계좌·개인정보·금융 데이터를 쓰지 않는다. 테스트 계정·가짜 데이터만 사용.
+  # HTTPS 준비되면(도메인 + ACM 인증서) 아래 주석을 풀기 → 443 열기 + http→https 자동 이동
   # - path: ingress-https-patch.yaml

@@ -7,8 +7,15 @@ spec:
     spec:
       serviceAccountName: sai-api              # 3번 신분증 → S3 권한
       terminationGracePeriodSeconds: 60
-      # 노드가 여러 대가 되면 백엔드를 서로 다른 노드에 나눠 배치 (지금 1대라 영향 없음)
+      # 백엔드 2개를 되도록 서로 다른 AZ·노드에 나눠 배치
+      # ScheduleAnyway: 한 AZ가 죽어도 남은 곳에 새 파드를 띄움 (Pending으로 멈추지 않게)
       topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: sai-api
         - maxSkew: 1
           topologyKey: kubernetes.io/hostname
           whenUnsatisfiable: ScheduleAnyway

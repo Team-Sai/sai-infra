@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sai-web
+spec:
+  template:
+    spec:
+      terminationGracePeriodSeconds: 30
+      # 프론트 2개도 되도록 서로 다른 AZ에 배치
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: sai-web
+      containers:
+        - name: web
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sleep", "15"]   # ALB에서 빠질 시간 (api와 같은 이유)
