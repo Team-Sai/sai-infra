@@ -67,13 +67,12 @@ REDIS_PASSWORD=<로컬용 Redis 비밀번호>
 - DB·Redis 주소와 비밀번호는 overlays/local/api-local-patch.yaml의 환경 변수가 yml 값을 덮어쓴다.
 - Secret 값을 바꿀 때 (명령줄에 비밀번호를 쓰지 않는다):
 ```bash
-  kubectl -n sai create secret generic sai-local-db \
-    --from-env-file=kubernetes/overlays/local/local-db.env \
-    --dry-run=client -o yaml | kubectl apply -f -
-  kubectl -n sai create secret generic sai-api-config \
-    --from-file=application-dev.yml=<로컬 application-dev.yml 경로> \
-    --dry-run=client -o yaml | kubectl apply -f -
-  kubectl -n sai rollout restart deployment/sai-api
+kubectl create namespace sai
+kubectl -n sai create secret generic sai-local-db \
+  --from-env-file=kubernetes/overlays/local/local-db.env
+kubectl -n sai create secret generic sai-api-config \
+  --from-file=application-dev.yml=<로컬 application-dev.yml 경로>
+kubectl -n sai get secret   # 2개 보이면 성공
 ```
 - local-db.env는 WSL에서 만든다. (Windows 편집기로 만들면 줄 끝 CRLF가 비밀번호에 섞일 수 있음)
 
