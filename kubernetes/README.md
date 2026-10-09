@@ -52,10 +52,9 @@ kind load docker-image sai-backend:local sai-frontend:local --name sai
 비밀번호는 명령줄에 직접 쓰지 않는다. (명령 기록에 남음)
 로컬 전용 파일을 만들고, 이 파일은 Git에 올리지 않는다. (.gitignore의 `kubernetes/**/*.env`)
 
+**1) 비밀번호 파일 만들기** (WSL에서. Windows 편집기로 만들면 줄 끝 CRLF가 비밀번호에 섞일 수 있음)
 ```bash
-# 파일 만들기 (편집기로 값 입력 후 저장)
 vi kubernetes/overlays/local/local-db.env
-chmod 600 kubernetes/overlays/local/local-db.env
 ```
 파일 내용 형식:
 ```
@@ -63,9 +62,8 @@ MARIADB_ROOT_PASSWORD=<로컬용 root 비밀번호>
 MARIADB_PASSWORD=<로컬용 앱 계정 비밀번호>
 REDIS_PASSWORD=<로컬용 Redis 비밀번호>
 ```
-- application-dev.yml의 spring.sql.init.schema-locations는 백엔드 src/test/resources/application-test.yml과 **같은 순서**여야 빈 DB에서 테이블이 생성된다.
-- DB·Redis 주소와 비밀번호는 overlays/local/api-local-patch.yaml의 환경 변수가 yml 값을 덮어쓴다.
-- Secret 값을 바꿀 때 (명령줄에 비밀번호를 쓰지 않는다):
+
+**2) Secret 처음 만들기**
 ```bash
 kubectl create namespace sai
 kubectl -n sai create secret generic sai-local-db \
@@ -74,7 +72,20 @@ kubectl -n sai create secret generic sai-api-config \
   --from-file=application-dev.yml=<로컬 application-dev.yml 경로>
 kubectl -n sai get secret   # 2개 보이면 성공
 ```
-- local-db.env는 WSL에서 만든다. (Windows 편집기로 만들면 줄 끝 CRLF가 비밀번호에 섞일 수 있음)
+- application-dev.yml의 spring.sql.init.schema-locations는 백엔드 src/test/resources/application-test.yml과 **같은 순서**여야 빈 DB에서 테이블이 생성된다.
+- DB·Redis 주소와 비밀번호는 overlays/local/api-local-patch.yaml의 환경 변수가 yml 값을 덮어쓴다.
+
+**3) Secret 값을 바꿀 때**
+```bash
+kubectl -n sai create secret generic sai-local-db \
+  --from-env-file=kubernetes/overlays/local/local-db.env \
+  --dry-run=client -o yaml | kubectl apply -f -
+kubectl -n sai create secret generic sai-api-config \
+  --from-file=application-dev.yml=<로컬 application-dev.yml 경로> \
+  --dry-run=client -o yaml | kubectl apply -f -
+kubectl -n sai rollout restart deployment/sai-api
+```
+- MariaDB 비밀번호는 DB가 처음 만들어질 때만 적용된다. 바꾸려면 mariadb Deployment와 PVC(mariadb-data)를 지우고 다시 만든다. (로컬 데이터 사라짐)
 
 ### 4. 배포와 접속
 ```bash
