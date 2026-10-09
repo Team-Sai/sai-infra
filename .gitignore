@@ -64,5 +64,5 @@ kubernetes/**/application*.yml
 kubeconfig
 *.kubeconfig
 
-#로컬 Secret 값 파일 (kubectl create secret --from-enc-file용)
+#로컬 Secret 값 파일 (kubectl create secret --from-env-file용)
 kubernetes/**/*.env
