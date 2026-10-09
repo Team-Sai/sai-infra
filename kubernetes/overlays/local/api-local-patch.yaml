@@ -14,13 +14,13 @@ spec:
               value: dev
             - name: SPRING_DATASOURCE_URL           # spring.datasource.url
               value: jdbc:mariadb://mariadb:3306/sai_backend
-            - name: SPRING_DATASOURCE_USERNAME
-              value: root
+            - name: SPRING_DATASOURCE_USERNAME      # root 대신 앱 전용 계정
+              value: sai_backend
             - name: SPRING_DATASOURCE_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: sai-local-db
-                  key: MARIADB_ROOT_PASSWORD
+                  key: MARIADB_PASSWORD
             - name: SPRING_DATA_REDIS_HOST          # spring.data.redis.host
               value: redis
             - name: SPRING_DATA_REDIS_PORT

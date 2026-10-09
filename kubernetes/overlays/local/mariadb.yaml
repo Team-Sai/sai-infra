@@ -37,13 +37,21 @@ spec:
             - --character-set-server=utf8mb4
             - --collation-server=utf8mb4_unicode_ci
           env:
-            - name: MARIADB_ROOT_PASSWORD
+            - name: MARIADB_ROOT_PASSWORD   # 관리용. 앱은 쓰지 않음
               valueFrom:
                 secretKeyRef:
                   name: sai-local-db
                   key: MARIADB_ROOT_PASSWORD
-            - name: MARIADB_DATABASE      # 처음 켜질 때 이 DB를 자동 생성
+            - name: MARIADB_DATABASE        # 처음 켜질 때 이 DB를 자동 생성
               value: sai_backend
+            # 앱 전용 계정: 처음 켜질 때 자동 생성, sai_backend DB에만 권한
+            - name: MARIADB_USER
+              value: sai_backend
+            - name: MARIADB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: sai-local-db
+                  key: MARIADB_PASSWORD
           ports:
             - containerPort: 3306
           readinessProbe:

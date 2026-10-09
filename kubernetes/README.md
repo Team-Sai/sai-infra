@@ -24,9 +24,12 @@
 | 이름 | 키 | 용도 | 환경 |
 |---|---|---|---|
 | sai-api-config | application-dev.yml 등 | 백엔드 설정 파일 → /app/config 에 마운트 | 공통 |
-| sai-local-db | MARIADB_ROOT_PASSWORD, REDIS_PASSWORD | 로컬 MariaDB·Redis 비밀번호 | local |
+| sai-local-db | MARIADB_ROOT_PASSWORD, MARIADB_PASSWORD, REDIS_PASSWORD | 로컬 MariaDB(관리용·앱용)·Redis 비밀번호 | local |
 
 ## 로컬(kind) 실행 방법
+> ⚠️ overlays/local 은 **로컬 개발 전용**이다. MariaDB·Redis를 Pod로 띄우고 약한 비밀번호를 써도 되는 연습 환경이며,
+> AWS(overlays/demo)에는 배포되지 않는다. 실제 데이터를 넣지 않는다.
+> 비밀번호는 명령줄 인수·명령 기록에 남지 않게 한다. (Secret 파일 입력, Redis는 설정 파일로 전달)
 
 ### 1. 클러스터와 입구(Traefik)
 ```bash
@@ -46,21 +49,26 @@ kind load docker-image sai-backend:local sai-frontend:local --name sai
 - 로컬에서 빌드한 이미지는 어디에도 push하지 않는다. (AWS용 이미지는 CI가 Git 기준으로 빌드)
 
 ### 3. Secret 생성
+비밀번호는 명령줄에 직접 쓰지 않는다. (명령 기록에 남음)
+로컬 전용 파일을 만들고, 이 파일은 Git에 올리지 않는다. (.gitignore의 `kubernetes/**/*.env`)
+
+```bash
+# 파일 만들기 (편집기로 값 입력 후 저장)
+vi kubernetes/overlays/local/local-db.env
+chmod 600 kubernetes/overlays/local/local-db.env
+```
+파일 내용 형식:
+```
+MARIADB_ROOT_PASSWORD=<로컬용 root 비밀번호>
+MARIADB_PASSWORD=<로컬용 앱 계정 비밀번호>
+REDIS_PASSWORD=<로컬용 Redis 비밀번호>
+```
 ```bash
 kubectl create namespace sai
 kubectl -n sai create secret generic sai-local-db \
-  --from-literal=MARIADB_ROOT_PASSWORD='<로컬용 비밀번호>' \
-  --from-literal=REDIS_PASSWORD='<로컬용 비밀번호>'
+  --from-env-file=kubernetes/overlays/local/local-db.env
 kubectl -n sai create secret generic sai-api-config \
   --from-file=application-dev.yml=<로컬 application-dev.yml 경로>
-```
-- application-dev.yml의 spring.sql.init.schema-locations는 백엔드 src/test/resources/application-test.yml과 **같은 순서**여야 빈 DB에서 테이블이 생성된다.
-- DB·Redis 주소와 비밀번호는 overlays/local/api-local-patch.yaml의 환경 변수가 yml 값을 덮어쓴다.
-- Secret 값을 바꿀 때:
-```bash
-  kubectl -n sai create secret generic sai-api-config --from-file=... \
-    --dry-run=client -o yaml | kubectl apply -f -
-  kubectl -n sai rollout restart deployment/sai-api
 ```
 
 ### 4. 배포와 접속
@@ -94,3 +102,4 @@ kind delete cluster --name sai
 
 ## AWS를 내릴 때
 - Ingress를 먼저 지우고 ALB가 삭제된 것을 확인한 뒤 terraform destroy
+

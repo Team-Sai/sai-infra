@@ -1,4 +1,4 @@
-# 로컬 전용 Redis (AWS에서는 ElastiCache)
+# ⚠️ 로컬(kind) 개발 전용 Redis. AWS에서는 ElastiCache를 사용하며 이 파일은 배포되지 않는다.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -24,8 +24,22 @@ spec:
                 secretKeyRef:
                   name: sai-local-db
                   key: REDIS_PASSWORD
-          # $(REDIS_PASSWORD) 자리에 위 env 값이 들어감. 디스크 저장은 끔(임시 데이터용)
-          args: ["--requirepass", "$(REDIS_PASSWORD)", "--save", "", "--appendonly", "no"]
+          # 비밀번호를 명령 인수(--requirepass)로 넘기지 않는다. (ps로 누구나 볼 수 있음)
+          # 시작할 때 설정 파일에 적고(소유자만 읽기 가능), Redis는 그 파일을 읽는다.
+          # 디스크 저장은 끔 (임시 데이터용)
+          # 비밀번호를 명령 인수(--requirepass)로 넘기지 않는다. (ps로 누구나 볼 수 있음)
+          # 시작할 때 설정 파일에 적고(소유자만 읽기 가능), Redis는 그 파일을 읽는다.
+          # 비밀번호에 띄어쓰기·#·따옴표가 있어도 되도록 큰따옴표로 감싸고 \ 와 " 는 이스케이프
+          # 디스크 저장은 끔 (임시 데이터용)
+          command: [ "sh", "-c" ]
+          args:
+            - |
+              umask 077
+              ESCAPED=$(printf '%s' "$REDIS_PASSWORD" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')
+              printf 'requirepass "%s"\nsave ""\nappendonly no\n' "$ESCAPED" > /tmp/redis.conf
+              unset ESCAPED
+              chown redis:redis /tmp/redis.conf
+              exec docker-entrypoint.sh redis-server /tmp/redis.conf
           ports:
             - containerPort: 6379
           readinessProbe:
