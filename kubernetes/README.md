@@ -72,6 +72,13 @@ kubectl -n sai create secret generic sai-api-config \
   --from-file=application-dev.yml=<로컬 application-dev.yml 경로>
 kubectl -n sai get secret   # 2개 보이면 성공
 ```
+- 로컬 DB를 처음 만든 뒤 Spring Batch 저장소 테이블(BATCH_*)을 **한 번** 만든다.
+  백엔드가 `@EnableJdbcJobRepository`로 배치를 직접 설정해서, yml의 `spring.batch.jdbc.initialize-schema: always`가 동작하지 않는다.
+  (`batch-schema-mariadb.sql` 꺼내는 법은 아래 "DB 초기화 Job" 1번 참고, 두 번 실행하면 "이미 있음" 에러)
+```bash
+kubectl -n sai exec -i deploy/mariadb -- sh -c 'MYSQL_PWD="$MARIADB_ROOT_PASSWORD" mariadb -uroot sai_backend' \
+  < ~/sai-db/batch-schema-mariadb.sql
+```
 - application-dev.yml의 spring.sql.init.schema-locations는 백엔드 src/test/resources/application-test.yml과 **같은 순서**여야 빈 DB에서 테이블이 생성된다.
 - DB·Redis 주소와 비밀번호는 overlays/local/api-local-patch.yaml의 환경 변수가 yml 값을 덮어쓴다.
 
@@ -126,4 +133,109 @@ kind delete cluster --name sai
   이 상태에서는 테스트 계정과 가짜 데이터만 사용한다. 실제 계좌·개인정보는 HTTPS 적용 후에만 사용한다.
 - HTTPS 적용 조건: 도메인(Route53) + 서울 리전 ACM 인증서 ARN → kustomization.yaml에서 패치 주석 해제
 - 이미지 태그는 매번 달라야 한다. (ECR이 같은 태그 덮어쓰기를 막음 → git 커밋 해시 사용)
+
+## DB 초기화 Job (테이블 생성 + 앱 전용 계정)
+앱 계정은 데이터 읽기·쓰기(DML) 권한만 있어서 테이블을 만들 수 없다.
+배포 전에 이 Job을 관리자 계정으로 **한 번** 실행한다. (다시 실행해도 안전)
+
+하는 일: DB 생성(utf8mb4) → 앱 테이블 21개(application-test.yml 순서) → BATCH_ 테이블(없을 때만) → 앱 계정 생성·DML 권한
+
+### 1. 테이블 SQL을 ConfigMap으로
+백엔드는 **배포할 이미지와 같은 커밋**으로 체크아웃되어 있어야 한다.
+```bash
+# Spring Batch 테이블 SQL을 백엔드 이미지에서 꺼내기 (python3 필요)
+mkdir -p ~/sai-db && cd ~/sai-db
+docker create --name sai-tmp <백엔드 이미지>
+docker cp sai-tmp:/app/app.jar ./app.jar && docker rm sai-tmp
+python3 - <<'PY'
+import zipfile, io
+outer = zipfile.ZipFile("app.jar")
+lib = [n for n in outer.namelist() if "spring-batch-core" in n and n.endswith(".jar")][0]
+inner = zipfile.ZipFile(io.BytesIO(outer.read(lib)))
+sql = [n for n in inner.namelist() if n.endswith("schema-mariadb.sql")][0]
+open("batch-schema-mariadb.sql", "wb").write(inner.read(sql))
+print(lib, sql)
+PY
+cd -
+
+kubectl -n sai create configmap sai-db-schema \
+  --from-file="<sai-backend-v2 경로>/src/main/resources/db/" \
+  --from-file=batch-schema-mariadb.sql="$HOME/sai-db/batch-schema-mariadb.sql"
+kubectl -n sai get configmap sai-db-schema -o jsonpath='{.data}' | grep -o '"[^"]*\.sql"' | wc -l   # 20
+```
+- 경로에 띄어쓰기가 있으면 큰따옴표로 감싼다. (예: `"/mnt/c/Shinhan7 Work/sai-backend-v2/src/main/resources/db/"`)
+
+### 2. 접속 정보를 Secret으로 (비밀번호는 화면·명령 기록에 남기지 않는다)
+**kind**
+```bash
+ROOT_PW=$(grep '^MARIADB_ROOT_PASSWORD=' kubernetes/overlays/local/local-db.env | cut -d= -f2-)
+APP_PW=$(openssl rand -hex 16)
+cat > kubernetes/jobs/db-init/db-init.env <<EOF
+DB_HOST=mariadb
+DB_PORT=3306
+DB_NAME=sai
+DB_ADMIN_USER=root
+DB_ADMIN_PASSWORD=${ROOT_PW}
+APP_DB_USER=sai_app
+APP_DB_PASSWORD=${APP_PW}
+DB_CLIENT_OPTS=
+EOF
+unset ROOT_PW APP_PW
+```
+**AWS** (RDS master 비밀번호는 Secrets Manager에서 바로 꺼낸다)
+```bash
+ADMIN_JSON=$(aws secretsmanager get-secret-value --secret-id "<rds_master_secret_arn>" \
+  --query SecretString --output text --region ap-northeast-2)
+ADMIN_USER=$(printf '%s' "$ADMIN_JSON" | python3 -c 'import json,sys;print(json.load(sys.stdin)["username"])')
+ADMIN_PW=$(printf '%s' "$ADMIN_JSON" | python3 -c 'import json,sys;print(json.load(sys.stdin)["password"])')
+APP_PW=$(openssl rand -hex 16)
+cat > kubernetes/jobs/db-init/db-init.env <<EOF
+DB_HOST=<terraform output rds_endpoint>
+DB_PORT=3306
+DB_NAME=sai
+DB_ADMIN_USER=${ADMIN_USER}
+DB_ADMIN_PASSWORD=${ADMIN_PW}
+APP_DB_USER=sai_app
+APP_DB_PASSWORD=${APP_PW}
+DB_CLIENT_OPTS=
+EOF
+unset ADMIN_JSON ADMIN_USER ADMIN_PW APP_PW
+```
+- AWS에서 TLS 인증서 오류가 나면 `DB_CLIENT_OPTS`에 RDS 인증서 옵션을 넣는다. (첫 배포 때 확인)
+- 앱 계정 정보는 Terraform이 만든 빈 금고(`<name_prefix>/database/application`)에도 넣어 둔다.
+
+```bash
+kubectl -n sai create secret generic sai-db-init --from-env-file=kubernetes/jobs/db-init/db-init.env
+```
+
+### 3. 실행과 확인
+```bash
+kubectl apply -k kubernetes/jobs/db-init
+kubectl -n sai wait --for=condition=complete job/sai-db-init --timeout=180s
+kubectl -n sai logs job/sai-db-init          # 마지막 줄: 완료: sai 테이블 30개
+```
+- 다시 실행: `kubectl -n sai delete job sai-db-init` 후 apply
+- 멈춰 있으면(ContainerCreating): ConfigMap `sai-db-schema`와 Secret `sai-db-init`이 둘 다 있는지 확인
+- 백엔드에 새 SQL 파일이 생기면 로그에 "순서 목록에 없는 파일" 경고가 나온다 → db-init.sh 의 ORDER에
+
+## AWS 운영 설정(Secret) 만들기
+실제 값이 든 파일은 Git에 올리지 않는다. (`kubernetes/**/application*.yml` 제외, `*.example.yml`만 허용)
+
+```bash
+cp kubernetes/overlays/demo/application-prod.example.yml kubernetes/overlays/demo/application-prod.yml
+git status        # application-prod.yml 이 목록에 "없어야" 함
+```
+1. `<...>` 칸을 채운다.
+  - 주소: `terraform output` 값
+  - 비밀 값(jwt, link-*): `openssl rand -base64 32` 로 새로 만든다. dev 값 재사용 금지
+  - DB 비밀번호: DB 초기화 Job에 넣은 `APP_DB_PASSWORD`
+2. Secret 생성
+```bash
+kubectl config current-context
+kubectl -n sai create secret generic sai-api-config \
+  --from-file=application-prod.yml=kubernetes/overlays/demo/application-prod.yml
+```
+3. 채운 파일은 채팅·메신저·이슈에 붙이지 않는다.
+- HTTP 단계에서는 `jwt.cookie.secure: false`, HTTPS 적용 후 `true`
+- 테이블은 앱이 만들지 않는다. 배포 전에 "DB 초기화 Job"을 먼저 실행한다.
 

@@ -1,0 +1,102 @@
+# ─────────────────────────────────────────────────────────────
+# AWS(demo) 백엔드 운영 설정 "예시". 값은 모두 비워 둔다.
+# 실제 파일은 같은 폴더에 application-prod.yml 로 복사해서 채운다. (.gitignore로 Git 제외)
+# 채운 파일은 Secret(sai-api-config)으로 넣는다 → 파드의 /app/config/application-prod.yml
+# 절차: kubernetes/README.md "AWS 운영 설정(Secret) 만들기"
+# ─────────────────────────────────────────────────────────────
+
+server:
+  shutdown: graceful                      # 종료 신호를 받으면 처리 중인 요청을 끝내고 내려감
+spring:
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+
+  datasource:
+    url: jdbc:mariadb://<terraform output rds_endpoint>:3306/sai
+    username: sai_app                     # DB 초기화 Job이 만든 앱 계정 (DML 권한만)
+    password: <DB 초기화 Job에 넣은 APP_DB_PASSWORD>
+    driver-class-name: org.mariadb.jdbc.Driver
+    hikari:
+      maximum-pool-size: 10               # 파드 2개 × 10 = 최대 20 연결
+
+  sql:
+    init:
+      mode: never                         # 테이블은 앱이 만들지 않는다 (DB 초기화 Job 담당)
+  batch:
+    job:
+      enabled: false                      # 켜질 때 배치를 바로 돌리지 않음 (스케줄러가 실행)
+    jdbc:
+      initialize-schema: never            # BATCH_ 테이블은 DB 초기화 Job이 만든다 (@EnableJdbcJobRepository라 이 설정은 어차피 동작 안 함)
+
+  data:
+    redis:
+      host: <terraform output redis_primary_endpoint>
+      port: 6379
+      ssl:
+        enabled: true                     # ElastiCache 전송 암호화(TLS)
+
+  servlet:
+    multipart:
+      max-file-size: 5MB                  # 백엔드 팀 확인 필요
+      max-request-size: 10MB
+
+# Redis IAM 인증 (백엔드 PR #124). 비밀번호 대신 15분짜리 서명 토큰으로 접속
+sai:
+  redis:
+    iam-auth:
+      enabled: true
+      replication-group-id: <Redis replication group ID>
+      user-id: <ElastiCache 앱 사용자 ID>
+      region: ap-northeast-2
+  backend:
+    base-url: <>
+  mock-bank:
+    base-url: <백엔드가 서버끼리 부르는 목뱅크 내부 주소>
+    public-base-url: <브라우저가 여는 목뱅크 주소>
+
+app:
+  frontend:
+    base-url: <sai.backend.base-url 과 같은 주소 (같은 ALB에서 /api 와 / 를 나눔)>
+
+# 파일 저장: S3 (백엔드 PR #124)
+file:
+  storage: s3
+  upload-dir: /tmp/sai-uploads            # S3 모드에서는 쓰지 않지만 설정 이름이 필요함
+  s3:
+    bucket: <terraform output s3_bucket_name (파일 전용 버킷)>
+    region: ap-northeast-2
+    key-prefix: <인프라와 합의한 prefix>
+
+# ── 비밀 값: 새로 만들어 넣는다. dev와 같은 값을 쓰지 않는다 ──
+jwt:
+  secret: <openssl rand -base64 32>
+  access-token-expiration-ms: 1800000
+  refresh-token-expiration-ms: 1209600000
+  link-state-expiration-ms: 600000
+  cookie:
+    secure: false                         # ⚠️ HTTP 단계에서는 false (true면 로그인 쿠키가 안 붙음). HTTPS 적용 후 true
+link-identity:
+  hash-secret: <openssl rand -base64 32>
+link-state:
+  secret: <openssl rand -base64 32>
+  allowed-return-urls: <sai.backend.base-url>/accounts/link/callback
+link-callback:
+  api-key: <목뱅크와 같은 값. Secrets Manager에서 꺼냄>
+portone:
+  identity:
+    base-url: <포트원 API 주소>
+    store-id: <포트원 store id>
+    channel-key: <포트원 channel key>
+    api-secret: <포트원 API secret>
+    valid-minutes: 10
+slack:
+  batch-notification:
+    webhook-url: ""
+    enabled: false
+account-link:
+  max-concurrent: 3
+
+management:
+  health:
+    redis:
+      enabled: false                      # Redis IAM 사용자는 INFO 명령 권한이 없어 상태 검사가 DOWN으로 보임 → 끔
