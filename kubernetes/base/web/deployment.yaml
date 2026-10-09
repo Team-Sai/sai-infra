@@ -1,0 +1,40 @@
+# 프론트(Nginx + React 빌드 결과물) - 로컬/AWS 공통
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sai-web
+  labels:
+    app: sai-web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sai-web
+  template:
+    metadata:
+      labels:
+        app: sai-web
+    spec:
+      containers:
+        - name: web
+          image: sai-frontend
+          ports:
+            - name: http
+              containerPort: 80
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 128Mi
+          # nginx.conf에 만들어 둔 /healthz 를 여기서 씀
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 20
