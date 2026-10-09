@@ -6,7 +6,7 @@
     - web/: 프론트(Nginx) Deployment·Service
     - ai/: (예정) FastAPI·Qdrant
 - overlays/local/: 노트북 kind용 (MariaDB, Redis를 Pod로 실행, Traefik Ingress)
-- overlays/demo/: AWS EKS용 (ALB Ingress, ECR 이미지, EBS)
+- overlays/demo/: AWS EKS용 (ALB Ingress, ECR 이미지, DB·Redis·파일은 RDS·ElastiCache·S3 사용)
 
 > overlays/local은 AWS에 배포되지 않는다. Argo CD는 overlays/demo만 바라본다.
 
@@ -118,4 +118,12 @@ kind delete cluster --name sai
 
 ## AWS를 내릴 때
 - Ingress를 먼저 지우고 ALB가 삭제된 것을 확인한 뒤 terraform destroy
+
+## AWS(demo) 배포 시 주의
+- AWS Load Balancer Controller를 먼저 설치한 뒤 demo를 apply한다. (namespace의 readiness gate 라벨을 Controller가 처리함)
+- 워커 노드는 AZ별 1대씩 총 2대 기준이다. api·web 각 2개가 AZ에 나뉘어 배치된다.
+- HTTPS 패치(ingress-https-patch.yaml)를 켜기 전에는 브라우저↔ALB 구간이 암호화되지 않는다.
+  이 상태에서는 테스트 계정과 가짜 데이터만 사용한다. 실제 계좌·개인정보는 HTTPS 적용 후에만 사용한다.
+- HTTPS 적용 조건: 도메인(Route53) + 서울 리전 ACM 인증서 ARN → kustomization.yaml에서 패치 주석 해제
+- 이미지 태그는 매번 달라야 한다. (ECR이 같은 태그 덮어쓰기를 막음 → git 커밋 해시 사용)
 
