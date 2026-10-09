@@ -8,7 +8,7 @@ resource "aws_s3_bucket" "backup" {
 
   tags = {
     Name        = "${var.name_prefix}-backup"
-    DataPurpose = "Application backup exports only"
+    DataPurpose = "Application uploaded files and backup exports"
   }
 }
 

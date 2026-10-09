@@ -158,15 +158,25 @@ variable "load_balancer_controller_service_account" {
 }
 
 variable "operator_access_entries" {
-  description = "팀원 IAM 역할별 EKS 권한입니다. 역할 ARN은 실제 팀 계정 값으로 채우고 필요한 권한만 부여하세요."
+  description = "팀원별 EKS 권한입니다. 실제 IAM 역할 또는 사용자 ARN을 지정하세요."
   type = map(object({
-    role_arn    = string
-    policy_arn  = string
-    scope_type  = string
-    namespaces  = optional(list(string), [])
-    run_as_user = string
+    principal_arn = string
+    policy_arn    = string
+    scope_type    = string
+    namespaces    = optional(list(string), [])
+    run_as_user   = string
   }))
-  default = {}
+  validation {
+    condition     = length(var.operator_access_entries) > 0
+    error_message = "클러스터 생성자가 자동 관리자가 아니므로 최소 한 명의 실제 EKS 운영자 principal ARN을 지정해야 합니다."
+  }
+
+  validation {
+    condition = alltrue([
+      for entry in values(var.operator_access_entries) : can(regex("^arn:[^:]+:iam::[0-9]{12}:(role|user)/.+$", entry.principal_arn))
+    ])
+    error_message = "각 principal_arn은 실제 계정 ID를 포함한 IAM role 또는 user ARN이어야 합니다."
+  }
 
   validation {
     condition = alltrue([
@@ -204,6 +214,17 @@ variable "session_log_retention_days" {
 
   validation {
     condition     = contains([1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1827, 3653], var.session_log_retention_days)
+    error_message = "CloudWatch Logs retention에는 AWS에서 지원하는 보존 기간을 지정해야 합니다."
+  }
+}
+
+variable "eks_control_plane_log_retention_days" {
+  description = "EKS API·audit 등 컨트롤 플레인 로그의 CloudWatch 보존 기간입니다."
+  type        = number
+  default     = 30
+
+  validation {
+    condition     = contains([1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1827, 3653], var.eks_control_plane_log_retention_days)
     error_message = "CloudWatch Logs retention에는 AWS에서 지원하는 보존 기간을 지정해야 합니다."
   }
 }

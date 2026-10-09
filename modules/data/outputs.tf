@@ -33,6 +33,16 @@ output "redis_port" {
   value       = aws_elasticache_replication_group.redis.port
 }
 
+output "redis_replication_group_id" {
+  description = "백엔드 sai.redis.iam-auth.replication-group-id 설정에 넣을 ElastiCache replication group ID입니다."
+  value       = aws_elasticache_replication_group.redis.replication_group_id
+}
+
+output "redis_iam_user_name" {
+  description = "백엔드 sai.redis.iam-auth.user-id 설정에 넣을 IAM 인증 Redis 사용자 이름입니다."
+  value       = aws_elasticache_user.application.user_name
+}
+
 output "redis_user_arn" {
   description = "IAM 인증에 사용하는 ElastiCache User ARN입니다."
   value       = aws_elasticache_user.application.arn

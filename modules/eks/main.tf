@@ -97,8 +97,10 @@ resource "aws_security_group" "nodes" {
   }
 
   tags = {
-    Name                    = "${var.name_prefix}-eks-nodes"
-    "elbv2.k8s.aws/cluster" = "${var.name_prefix}-eks"
+    Name = "${var.name_prefix}-eks-nodes"
+    # IP target 모드에서 AWS Load Balancer Controller가 Pod ENI의 SG를 찾습니다.
+    "kubernetes.io/cluster/${var.name_prefix}-eks" = "shared"
+    "elbv2.k8s.aws/cluster"                        = "${var.name_prefix}-eks"
   }
 }
 
@@ -214,7 +216,18 @@ resource "aws_eks_cluster" "main" {
   depends_on = [
     aws_iam_role_policy_attachment.cluster,
     aws_iam_role_policy.cluster_kms,
+    aws_cloudwatch_log_group.cluster,
   ]
+}
+
+# EKS가 자동 생성하는 로그 그룹은 기본적으로 무기한 보관될 수 있어 먼저 만들고 보존 기간을 지정합니다.
+resource "aws_cloudwatch_log_group" "cluster" {
+  name              = "/aws/eks/${var.name_prefix}-eks/cluster"
+  retention_in_days = var.cluster_log_retention
+
+  tags = {
+    Name = "${var.name_prefix}-eks-control-plane-logs"
+  }
 }
 
 resource "aws_kms_key" "eks" {
@@ -232,14 +245,24 @@ resource "aws_kms_alias" "eks" {
   target_key_id = aws_kms_key.eks.key_id
 }
 
-resource "aws_eks_addon" "managed" {
-  for_each = toset(["vpc-cni", "coredns", "kube-proxy", "eks-pod-identity-agent"])
+resource "aws_eks_addon" "pre_node" {
+  for_each = toset(["vpc-cni", "kube-proxy", "eks-pod-identity-agent"])
 
   cluster_name                = aws_eks_cluster.main.name
   addon_name                  = each.value
   configuration_values        = each.value == "vpc-cni" ? jsonencode({ enableNetworkPolicy = "true" }) : null
   resolve_conflicts_on_create = "OVERWRITE"
   resolve_conflicts_on_update = "OVERWRITE"
+}
+
+# CoreDNS는 실행될 Worker Node가 필요하므로 노드 그룹이 만들어진 뒤 설치합니다.
+resource "aws_eks_addon" "coredns" {
+  cluster_name                = aws_eks_cluster.main.name
+  addon_name                  = "coredns"
+  resolve_conflicts_on_create = "OVERWRITE"
+  resolve_conflicts_on_update = "OVERWRITE"
+
+  depends_on = [aws_eks_node_group.initial]
 }
 
 # VPC CNI에는 Pod Identity 전용 역할을 줍니다. 앱 Pod가 노드 역할의
@@ -282,8 +305,8 @@ resource "aws_eks_pod_identity_association" "vpc_cni" {
   role_arn        = aws_iam_role.vpc_cni.arn
 
   depends_on = [
-    aws_eks_addon.managed["eks-pod-identity-agent"],
-    aws_eks_addon.managed["vpc-cni"],
+    aws_eks_addon.pre_node["eks-pod-identity-agent"],
+    aws_eks_addon.pre_node["vpc-cni"],
     aws_iam_role_policy_attachment.vpc_cni,
   ]
 }
@@ -325,7 +348,7 @@ resource "aws_eks_access_entry" "operator" {
   for_each = var.operator_access_entries
 
   cluster_name  = aws_eks_cluster.main.name
-  principal_arn = each.value.role_arn
+  principal_arn = each.value.principal_arn
   type          = "STANDARD"
 }
 
@@ -333,7 +356,7 @@ resource "aws_eks_access_policy_association" "operator" {
   for_each = var.operator_access_entries
 
   cluster_name  = aws_eks_cluster.main.name
-  principal_arn = each.value.role_arn
+  principal_arn = each.value.principal_arn
   policy_arn    = each.value.policy_arn
 
   access_scope {
@@ -372,7 +395,7 @@ resource "aws_eks_node_group" "initial" {
 
   depends_on = [
     aws_iam_role_policy_attachment.nodes,
-    aws_eks_addon.managed,
+    aws_eks_addon.pre_node,
     aws_eks_pod_identity_association.vpc_cni,
   ]
 }

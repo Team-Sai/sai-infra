@@ -38,13 +38,18 @@ variable "session_log_retention" {
   type        = number
 }
 
+variable "cluster_log_retention" {
+  description = "EKS 컨트롤 플레인 로그 보존 기간(일)입니다."
+  type        = number
+}
+
 variable "operator_access_entries" {
-  description = "팀원이 제공하는 역할 ARN과 EKS Access Policy 연결 설정입니다."
+  description = "팀원이 제공하는 IAM 역할 또는 사용자 ARN과 EKS Access Policy 연결 설정입니다."
   type = map(object({
-    role_arn    = string
-    policy_arn  = string
-    scope_type  = string
-    namespaces  = optional(list(string), [])
-    run_as_user = string
+    principal_arn = string
+    policy_arn    = string
+    scope_type    = string
+    namespaces    = optional(list(string), [])
+    run_as_user   = string
   }))
 }

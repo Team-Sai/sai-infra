@@ -3,13 +3,19 @@
 
 aws_region = "ap-northeast-2"
 
-# 실제 팀 IAM Identity Center 역할 ARN과 권한 정책 ARN으로 채웁니다.
-# 예: map key = 운영자 식별자, role_arn = 팀에서 만든 역할 ARN
+# 아래 2개는 형식 예시입니다. 적용 전 팀에서 실제로 사용하는 IAM 역할 ARN이나
+# IAM 사용자 ARN으로 바꾸세요. 권한 정책 ARN은 필요한 범위만 선택하세요.
 operator_access_entries = {
-  # platform_admin = {
-  #   role_arn   = "arn:aws:iam::<ACCOUNT_ID>:role/<TEAM_ROLE_NAME>"
-  #   policy_arn = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
-  #   scope_type = "cluster"
-  #   run_as_user = "platform-admin"
-  # }
+  kubernetes_operator_1 = {
+    principal_arn = "arn:aws:iam::<ACCOUNT_ID>:role/<TEAM_OPERATOR_ROLE_1>"
+    policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+    scope_type    = "cluster"
+    run_as_user   = "sai-operator-1"
+  }
+  kubernetes_operator_2 = {
+    principal_arn = "arn:aws:iam::<ACCOUNT_ID>:role/<TEAM_OPERATOR_ROLE_2>"
+    policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+    scope_type    = "cluster"
+    run_as_user   = "sai-operator-2"
+  }
 }

@@ -26,7 +26,7 @@ resource "aws_iam_role" "application" {
 
 resource "aws_iam_policy" "application" {
   name        = "${var.name_prefix}-application-data-access"
-  description = "App pod access to its S3 backup prefix and IAM-authenticated Redis user."
+  description = "App pod access to its S3 file prefix and IAM-authenticated Redis user."
 
   policy = jsonencode({
     Version = "2012-10-17"

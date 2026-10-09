@@ -38,9 +38,14 @@ output "operator_ssm_policy_arn" {
   value       = aws_iam_policy.operator_ssm.arn
 }
 
-output "operator_access_role_arns" {
-  description = "EKS Access Entry에 등록된 외부 운영자 역할 ARN입니다."
+output "operator_access_principal_arns" {
+  description = "EKS Access Entry에 등록된 IAM 역할 또는 사용자 principal ARN입니다."
   value       = [for entry in aws_eks_access_entry.operator : entry.principal_arn]
+}
+
+output "cluster_log_group_name" {
+  description = "보존 기간이 설정된 EKS 컨트롤 플레인 CloudWatch Logs 그룹입니다."
+  value       = aws_cloudwatch_log_group.cluster.name
 }
 
 output "session_document_name" {

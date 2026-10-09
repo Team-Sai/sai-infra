@@ -58,6 +58,12 @@ resource "aws_db_parameter_group" "mariadb" {
     apply_method = "pending-reboot"
   }
 
+  parameter {
+    name         = "collation_server"
+    value        = "utf8mb4_unicode_ci"
+    apply_method = "pending-reboot"
+  }
+
   tags = {
     Name = "${var.name_prefix}-mariadb-11-4"
   }

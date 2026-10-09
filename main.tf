@@ -19,6 +19,7 @@ module "eks" {
   node_instance_types     = var.eks_node_instance_types
   bastion_instance_type   = "t3.micro"
   session_log_retention   = var.session_log_retention_days
+  cluster_log_retention   = var.eks_control_plane_log_retention_days
   operator_access_entries = var.operator_access_entries
 }
 

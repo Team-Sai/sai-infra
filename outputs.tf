@@ -38,9 +38,9 @@ output "bastion_instance_id" {
   value       = module.eks.bastion_instance_id
 }
 
-output "operator_access_role_arns" {
-  description = "EKS Access Entry에 등록한 팀원 역할 ARN 목록입니다. 실제 값은 입력 변수에서 제공합니다."
-  value       = module.eks.operator_access_role_arns
+output "operator_access_principal_arns" {
+  description = "EKS Access Entry에 등록한 팀원 IAM 역할 또는 사용자 ARN 목록입니다. 실제 값은 입력 변수에서 제공합니다."
+  value       = module.eks.operator_access_principal_arns
 }
 
 output "bastion_operator_ssm_policy_arn" {
@@ -51,6 +51,11 @@ output "bastion_operator_ssm_policy_arn" {
 output "bastion_session_log_group_name" {
   description = "SSM 셸 세션 로그가 저장되는 CloudWatch Logs 그룹입니다."
   value       = module.eks.session_log_group_name
+}
+
+output "eks_control_plane_log_group_name" {
+  description = "보존 기간이 설정된 EKS API·audit 등 CloudWatch Logs 그룹입니다."
+  value       = module.eks.cluster_log_group_name
 }
 
 output "bastion_session_document_name" {
@@ -84,7 +89,7 @@ output "application_db_secret_arn" {
 }
 
 output "redis_primary_endpoint" {
-  description = "Multi-AZ Redis OSS Primary endpoint입니다."
+  description = "백엔드 spring.data.redis.host 설정값입니다. TLS 연결과 sai.redis.iam-auth.enabled=true 설정이 필요합니다."
   value       = module.data.redis_primary_endpoint
 }
 
@@ -98,14 +103,24 @@ output "redis_port" {
   value       = module.data.redis_port
 }
 
+output "redis_replication_group_id" {
+  description = "백엔드 sai.redis.iam-auth.replication-group-id 설정값입니다."
+  value       = module.data.redis_replication_group_id
+}
+
+output "redis_iam_user_name" {
+  description = "백엔드 sai.redis.iam-auth.user-id 설정값입니다. ElastiCache IAM 사용자 이름과 일치해야 합니다."
+  value       = module.data.redis_iam_user_name
+}
+
 output "ecr_repository_urls" {
   description = "저장소 이름별 ECR URL map입니다."
   value       = module.storage.ecr_repository_urls
 }
 
-output "backup_bucket_name" {
-  description = "앱 백업 파일·내보내기 파일 보관용 S3 버킷입니다. RDS 자동 백업은 이 버킷에 자동 복사되지 않습니다."
-  value       = module.storage.backup_bucket_name
+output "s3_bucket_name" {
+  description = "백엔드 file.s3.bucket 설정값입니다. 앱 파일 저장용이며 RDS 자동 백업은 이 버킷에 복사되지 않습니다."
+  value       = module.storage.s3_bucket_name
 }
 
 output "application_role_arns" {
@@ -115,9 +130,9 @@ output "application_role_arns" {
   }
 }
 
-output "application_backup_prefix" {
-  description = "앱이 S3 백업 파일을 저장할 prefix입니다."
-  value       = module.iam.application_backup_prefix
+output "application_s3_key_prefix" {
+  description = "백엔드 file.s3.key-prefix에 이 값을 지정해야 IAM의 최소 권한 경로와 일치합니다."
+  value       = module.iam.application_s3_key_prefix
 }
 
 output "load_balancer_controller_role_arn" {

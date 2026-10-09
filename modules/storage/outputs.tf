@@ -1,5 +1,5 @@
-output "backup_bucket_name" {
-  description = "앱 백업 파일 및 export를 보관할 비공개 S3 버킷 이름입니다."
+output "s3_bucket_name" {
+  description = "앱이 file.storage=s3로 저장할 비공개 S3 버킷 이름입니다."
   value       = aws_s3_bucket.backup.id
 }
 
