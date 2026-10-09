@@ -72,6 +72,13 @@ kubectl -n sai create secret generic sai-api-config \
   --from-file=application-dev.yml=<로컬 application-dev.yml 경로>
 kubectl -n sai get secret   # 2개 보이면 성공
 ```
+- 로컬 DB를 처음 만든 뒤 Spring Batch 저장소 테이블(BATCH_*)을 **한 번** 만든다.
+  백엔드가 `@EnableJdbcJobRepository`로 배치를 직접 설정해서, yml의 `spring.batch.jdbc.initialize-schema: always`가 동작하지 않는다.
+  (`batch-schema-mariadb.sql` 꺼내는 법은 아래 "DB 초기화 Job" 1번 참고, 두 번 실행하면 "이미 있음" 에러)
+```bash
+kubectl -n sai exec -i deploy/mariadb -- sh -c 'MYSQL_PWD="$MARIADB_ROOT_PASSWORD" mariadb -uroot sai_backend' \
+  < ~/sai-db/batch-schema-mariadb.sql
+```
 - application-dev.yml의 spring.sql.init.schema-locations는 백엔드 src/test/resources/application-test.yml과 **같은 순서**여야 빈 DB에서 테이블이 생성된다.
 - DB·Redis 주소와 비밀번호는 overlays/local/api-local-patch.yaml의 환경 변수가 yml 값을 덮어쓴다.
 
@@ -126,4 +133,25 @@ kind delete cluster --name sai
   이 상태에서는 테스트 계정과 가짜 데이터만 사용한다. 실제 계좌·개인정보는 HTTPS 적용 후에만 사용한다.
 - HTTPS 적용 조건: 도메인(Route53) + 서울 리전 ACM 인증서 ARN → kustomization.yaml에서 패치 주석 해제
 - 이미지 태그는 매번 달라야 한다. (ECR이 같은 태그 덮어쓰기를 막음 → git 커밋 해시 사용)
+
+## AWS 운영 설정(Secret) 만들기
+실제 값이 든 파일은 Git에 올리지 않는다. (`kubernetes/**/application*.yml` 제외, `*.example.yml`만 허용)
+
+```bash
+cp kubernetes/overlays/demo/application-prod.example.yml kubernetes/overlays/demo/application-prod.yml
+git status        # application-prod.yml 이 목록에 "없어야" 함
+```
+1. `<...>` 칸을 채운다.
+  - 주소: `terraform output` 값
+  - 비밀 값(jwt, link-*): `openssl rand -base64 32` 로 새로 만든다. dev 값 재사용 금지
+  - DB 비밀번호: DB 초기화 Job에 넣은 `APP_DB_PASSWORD`
+2. Secret 생성
+```bash
+kubectl config current-context
+kubectl -n sai create secret generic sai-api-config \
+  --from-file=application-prod.yml=kubernetes/overlays/demo/application-prod.yml
+```
+3. 채운 파일은 채팅·메신저·이슈에 붙이지 않는다.
+- HTTP 단계에서는 `jwt.cookie.secure: false`, HTTPS 적용 후 `true`
+- 테이블은 앱이 만들지 않는다. 배포 전에 "DB 초기화 Job"을 먼저 실행한다.
 

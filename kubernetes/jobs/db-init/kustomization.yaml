@@ -1,0 +1,14 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# DB 초기화 Job: 배포(overlays)와 따로, 필요할 때만 직접 실행한다
+namespace: sai
+
+resources:
+  - job.yaml
+
+# 스크립트를 ConfigMap으로 만들어 Job에 꽂음
+configMapGenerator:
+  - name: sai-db-init-script
+    files:
+      - db-init.sh

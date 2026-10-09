@@ -1,0 +1,50 @@
+# DB 초기 설정 (1회성)
+#   테이블 생성 + BATCH_ 테이블(없을 때만) + 앱 전용 계정(DML 권한만)
+# 필요한 것 (실행 전에 만들기, README 참고)
+#   - ConfigMap sai-db-schema : 백엔드 src/main/resources/db/*.sql (+ batch-schema-mariadb.sql)
+#   - Secret    sai-db-init   : 접속 정보·비밀번호 (db-init.env.example 형식). 끝나면 삭제
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: sai-db-init
+  labels:
+    app: sai-db-init
+spec:
+  backoffLimit: 1                    # 실패하면 1번만 다시 시도
+  ttlSecondsAfterFinished: 3600      # 끝나고 1시간 뒤 Job 기록 자동 삭제
+  template:
+    metadata:
+      labels:
+        app: sai-db-init
+    spec:
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999               # mariadb 이미지의 mysql 사용자
+      containers:
+        - name: db-init
+          image: mariadb:11.4        # 서버는 안 켜고 클라이언트(mariadb 명령)만 사용
+          command: ["bash", "/scripts/db-init.sh"]
+          envFrom:
+            - secretRef:
+                name: sai-db-init
+          volumeMounts:
+            - name: schema
+              mountPath: /schema
+              readOnly: true
+            - name: scripts
+              mountPath: /scripts
+              readOnly: true
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
+      volumes:
+        - name: schema
+          configMap:
+            name: sai-db-schema
+        - name: scripts
+          configMap:
+            name: sai-db-init-script
