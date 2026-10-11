@@ -1,0 +1,10 @@
+# 도메인 + ACM 인증서가 준비되면 kustomization.yaml에서 주석을 풀어 적용
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: sai
+  annotations:
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: "443"            # http로 오면 https로 자동 이동
+    # ⚠️ 빈칸: terraform output의 ACM 인증서 ARN (ap-northeast-2)
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:ap-northeast-2:000000000000:certificate/change-me

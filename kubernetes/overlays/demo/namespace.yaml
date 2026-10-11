@@ -1,0 +1,7 @@
+# sai 방. 라벨을 붙이면 LB Controller가 "ALB에 등록 완료"까지 확인한 뒤에야 Pod를 Ready로 침
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: sai
+  labels:
+    elbv2.k8s.aws/pod-readiness-gate-inject: enabled

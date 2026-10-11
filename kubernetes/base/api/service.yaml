@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: sai-api
+spec:
+  selector:
+    app: sai-api          # 이 라벨이 붙은 Pod들에게 요청을 나눠 줌
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
