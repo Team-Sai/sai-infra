@@ -1,23 +1,3 @@
-### Traefik 설정 (Argo CD가 Healthy로 보려면)
-Argo CD는 Ingress에 주소가 적혀야 Healthy로 판단한다. kind의 Traefik(NodePort)은 기본값으로는 주소를 안 적어서
-Progressing에 머문다 → Ingress 주소를 127.0.0.1로 적게 설정한다. (AWS는 ALB 주소가 자동으로 적힘)
-
-처음 설치할 때:
-```bash
-helm install traefik traefik/traefik --version 41.7.0 -n traefik --create-namespace \
-  --set service.type=NodePort --set ports.web.nodePort=30080 \
-  --set providers.kubernetesIngress.publishedService.enabled=false \
-  --set "additionalArguments={--providers.kubernetesingress.ingressendpoint.ip=127.0.0.1}"
-```
-이미 설치돼 있으면:
-```bash
-helm upgrade traefik traefik/traefik --version 41.7.0 -n traefik --reuse-values \
-  --set providers.kubernetesIngress.publishedService.enabled=false \
-  --set "additionalArguments={--providers.kubernetesingress.ingressendpoint.ip=127.0.0.1}"
-kubectl -n sai get ingress      # ADDRESS 127.0.0.1
-```
-- `publishedService`(차트 기본값)가 켜져 있으면 그쪽이 먼저 쓰여서 주소가 비어 버린다. 반드시 끈다.
-
 # platform: 클러스터 공용 프로그램 설치
 
 AWS EKS를 만든 뒤 앱보다 **먼저** 설치하는 프로그램과, EKS 접속·배포하는 날 순서를 정리한다.
@@ -40,8 +20,9 @@ helm repo update
 - aws-load-balancer-controller/values.yaml: clusterName·vpcId는 빈칸 (설치할 때 `--set`으로 넣음)
 - metrics-server/values.yaml (EKS), values-kind.yaml (kind에서만 추가)
 - argocd/values.yaml: 인터넷에 열지 않음(ClusterIP), SSO·알림 끔, 요청량 작게
-- argocd/apps/sai-demo.yaml: AWS용 (dev 브랜치의 overlays/demo)
+- argocd/apps/sai-demo.yaml: AWS용 (**main** 브랜치의 overlays/demo. dev → main PR이 곧 배포)
 - argocd/apps/sai-local.yaml: kind 연습용 (dev 브랜치의 overlays/local)
+- argocd/projects/sai.yaml: Argo CD 프로젝트. sai-infra 레포 → sai 네임스페이스만 허용 (default 프로젝트 안 씀)
 
 ---
 
@@ -91,6 +72,7 @@ kubectl top nodes
 helm install argocd argo/argo-cd --version 10.10.2 -n argocd --create-namespace \
   -f kubernetes/platform/argocd/values.yaml
 kubectl -n argocd get pods            # 전부 Running
+kubectl apply -f kubernetes/platform/argocd/projects/sai.yaml    # Application보다 먼저
 ```
 - LB Controller 권한은 Pod Identity(kube-system/aws-load-balancer-controller)로 연결된다. 서비스 계정에 annotation을 넣지 않는다.
 - 노드 IMDS가 막혀 있어(hop limit 1) region·vpcId를 컨트롤러가 스스로 못 찾는다 → 반드시 지정.
@@ -115,7 +97,7 @@ kubectl -n argocd delete secret argocd-initial-admin-secret   # 로그인 확인
 | 4 | 이미지 ECR push (태그 = git 커밋 해시) | ECR에 태그 |
 | 5 | DB 초기화 Job (kubernetes/README.md) → Secret 삭제 | 로그: Ssl_version, 테이블 32개 |
 | 6 | 운영 설정 Secret `sai-api-config` | `kubectl -n sai get secret` |
-| 7 | overlays/demo의 ECR 주소·태그를 채워 dev에 머지 | `kubectl kustomize kubernetes/overlays/demo` 빈칸 없음 |
+| 7 | overlays/demo의 ECR 주소·태그를 채워 dev에 머지 → **dev → main PR 머지** | `kubectl kustomize kubernetes/overlays/demo` 빈칸 없음 |
 | 8 | `kubectl apply -f kubernetes/platform/argocd/apps/sai-demo.yaml` | Application Synced / Healthy, ALB 주소 생성 |
 | 9 | 회원가입·로그인·업로드·AI 분석 | 브라우저 |
 | 10 | 파드 1개 삭제·롤링 배포 중 요청 | 에러 0번 |
@@ -143,6 +125,7 @@ helm install argocd argo/argo-cd --version 10.10.2 -n argocd --create-namespace 
   -f kubernetes/platform/argocd/values.yaml
 kubectl apply -f kubernetes/platform/argocd/apps/sai-local.yaml
 kubectl -n argocd get application sai-local        # Synced / Healthy
+kubectl apply -f kubernetes/platform/argocd/projects/sai.yaml
 ```
 - LB Controller는 kind에서 동작하지 않는다. 설치값 렌더링만 확인:
 ```bash
@@ -151,3 +134,24 @@ helm template aws-load-balancer-controller eks/aws-load-balancer-controller --ve
   --set clusterName=test --set vpcId=vpc-test | grep -nE "cluster-name|aws-region|aws-vpc-id"
 ```
 - 연습 끝: `kubectl -n argocd delete application sai-local` (리소스는 남음), `helm uninstall argocd -n argocd`
+
+### Traefik 설정 (Argo CD가 Healthy로 보려면)
+Argo CD는 Ingress에 주소가 적혀야 Healthy로 판단한다. kind의 Traefik(NodePort)은 기본값으로는 주소를 안 적어서
+Progressing에 머문다 → Ingress 주소를 127.0.0.1로 적게 설정한다. (AWS는 ALB 주소가 자동으로 적힘)
+
+처음 설치할 때:
+```bash
+helm install traefik traefik/traefik --version 41.7.0 -n traefik --create-namespace \
+  --set service.type=NodePort --set ports.web.nodePort=30080 \
+  --set providers.kubernetesIngress.publishedService.enabled=false \
+  --set "additionalArguments={--providers.kubernetesingress.ingressendpoint.ip=127.0.0.1}"
+```
+이미 설치돼 있으면:
+```bash
+helm upgrade traefik traefik/traefik --version 41.7.0 -n traefik --reuse-values \
+  --set providers.kubernetesIngress.publishedService.enabled=false \
+  --set "additionalArguments={--providers.kubernetesingress.ingressendpoint.ip=127.0.0.1}"
+kubectl -n sai get ingress      # ADDRESS 127.0.0.1
+```
+- `publishedService`(차트 기본값)가 켜져 있으면 그쪽이 먼저 쓰여서 주소가 비어 버린다. 반드시 끈다.
+

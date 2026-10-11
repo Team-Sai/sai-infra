@@ -1,14 +1,29 @@
 # AWS Load Balancer Controller: Ingress를 보고 ALB(인터넷 입구)를 만든다
 # 권한(IAM 역할)은 Terraform이 Pod Identity로 연결함 → 서비스 계정에 annotation을 넣지 않는다
-clusterName: <terraform output eks_cluster_name>
-region: ap-northeast-2                  # 노드 IMDS가 막혀 있어(hop limit 1) 스스로 못 알아냄 → 직접 지정
-vpcId: <terraform output vpc_id>        # 같은 이유로 직접 지정
+
+# 설치할 때 --set 으로 반드시 넣는다 (비워 두면 helm이 설치를 거부함 → 빼먹는 실수 방지)
+clusterName: ""                         # terraform output eks_cluster_name
+vpcId: ""                               # terraform output vpc_id. 노드 IMDS가 막혀 있어(hop limit 1) 스스로 못 알아냄
+region: ap-northeast-2                  # 같은 이유로 직접 지정
 
 serviceAccount:
   create: true
   name: aws-load-balancer-controller    # Terraform Pod Identity 연결(kube-system/aws-load-balancer-controller)과 같아야 함
 
-replicaCount: 2                         # 노드 2대에 하나씩 (하나 죽어도 Ingress 처리 계속)
+replicaCount: 2
+
+# 2개를 서로 다른 노드(AZ)에 나눠 배치
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: ScheduleAnyway
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/name: aws-load-balancer-controller
+
+# 노드 교체·업그레이드 때 한 번에 1개까지만 내려감
+podDisruptionBudget:
+  maxUnavailable: 1
 
 resources:
   requests:

@@ -6,7 +6,7 @@ metadata:
   name: sai-local
   namespace: argocd
 spec:
-  project: default
+  project: sai
   source:
     repoURL: https://github.com/Team-Sai/sai-infra.git   # 공개 레포라 인증 불필요
     targetRevision: dev
