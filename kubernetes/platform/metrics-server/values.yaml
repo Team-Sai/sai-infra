@@ -1,0 +1,7 @@
+# Metrics Server: 파드·노드의 CPU·메모리 사용량 수집 (kubectl top, 나중에 HPA의 기준)
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    memory: 128Mi

@@ -1,0 +1,21 @@
+# AWS: dev 브랜치의 overlays/demo 를 자동 배포
+# 먼저 준비할 것: LB Controller 설치, DB 초기화 Job, Secret(sai-api-config), demo의 ECR 주소·태그
+# DB 초기화 Job(kubernetes/jobs/db-init)은 Argo CD가 관리하지 않는다 (필요할 때 직접 실행)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: sai-demo
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Team-Sai/sai-infra.git
+    targetRevision: dev
+    path: kubernetes/overlays/demo
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: sai
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

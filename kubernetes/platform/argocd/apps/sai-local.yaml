@@ -1,0 +1,20 @@
+# kind 연습용: dev 브랜치의 overlays/local 을 자동 배포
+# Secret(sai-local-db, sai-api-config)은 Git에 없으므로 미리 만들어 둬야 한다 (Argo CD는 건드리지 않음)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: sai-local
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Team-Sai/sai-infra.git   # 공개 레포라 인증 불필요
+    targetRevision: dev
+    path: kubernetes/overlays/local
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: sai
+  syncPolicy:
+    automated:
+      prune: true        # Git에서 지운 리소스는 클러스터에서도 지움
+      selfHeal: true     # 누가 손으로 바꾸면 Git 상태로 되돌림
