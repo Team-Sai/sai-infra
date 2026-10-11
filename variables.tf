@@ -228,3 +228,40 @@ variable "eks_control_plane_log_retention_days" {
     error_message = "CloudWatch Logs retention에는 AWS에서 지원하는 보존 기간을 지정해야 합니다."
   }
 }
+
+# 저장소별로 허용할 GitHub Actions OIDC subject를 지정합니다.
+# 각 앱 저장소는 대응하는 ECR 저장소에만 이미지를 올릴 수 있게 분리합니다.
+variable "github_actions_ecr_subjects" {
+  description = "ECR 저장소 이름별로 해당 이미지를 게시할 수 있는 GitHub 저장소의 main 브랜치 OIDC subject입니다."
+  type        = map(string)
+  default = {
+    "sai-backend"   = "repo:Team-Sai@307796299/sai-backend-v2@1360767689:ref:refs/heads/main"
+    "sai-frontend"  = "repo:Team-Sai@307796299/sai-frontend@1367028447:ref:refs/heads/main"
+    "sai-mock-bank" = "repo:Team-Sai@307796299/sai-mock-bank@1312119875:ref:refs/heads/main"
+  }
+
+  validation {
+    condition = length(var.github_actions_ecr_subjects) > 0 && alltrue([
+      for subject in values(var.github_actions_ecr_subjects) :
+      startswith(subject, "repo:Team-Sai@307796299/") && endswith(subject, ":ref:refs/heads/main")
+    ])
+    error_message = "각 GitHub OIDC subject는 Team-Sai 저장소의 main 브랜치 형식이어야 합니다."
+  }
+}
+
+# 같은 AWS 계정에 GitHub OIDC provider가 이미 있다면 그 ARN을 넣습니다.
+# 비워 두면 모듈이 provider를 새로 선언합니다. 계정에는 같은 issuer provider를 중복 생성할 수 없습니다.
+variable "github_oidc_provider_arn" {
+  description = "이미 AWS IAM에 등록한 GitHub OIDC provider ARN입니다. 없으면 null로 두어 Terraform이 생성하게 하세요."
+  type        = string
+  default     = null
+  nullable    = true
+
+  validation {
+    condition = var.github_oidc_provider_arn == null || can(regex(
+      "^arn:[^:]+:iam::[0-9]{12}:oidc-provider/token\\.actions\\.githubusercontent\\.com$",
+      var.github_oidc_provider_arn
+    ))
+    error_message = "github_oidc_provider_arn은 token.actions.githubusercontent.com IAM provider ARN 또는 null이어야 합니다."
+  }
+}
