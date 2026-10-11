@@ -21,7 +21,6 @@ trap 'rm -f "$CNF"' EXIT
 ESCAPED_PW=$(printf '%s' "$DB_ADMIN_PASSWORD" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')
 printf '[client]\npassword="%s"\n' "$ESCAPED_PW" > "$CNF"
 unset ESCAPED_PW
-# DB_CLIENT_OPTS: TLS 옵션 등이 필요할 때만 (예: AWS RDS 인증서 옵션)
 # DB_CLIENT_OPTS: 추가 옵션이 필요할 때만
 read -r -a EXTRA <<< "${DB_CLIENT_OPTS:-}"
 

@@ -41,6 +41,15 @@ spring:
       max-file-size: 5MB                  # 백엔드 팀 확인 필요
       max-request-size: 10MB
 
+  # AI 상환 분석·일정 에이전트 (dev 기본 설정 application.yml은 none). 데모는 가짜 데이터만 사용
+  ai:
+    model:
+      chat: none
+    openai:
+      api-key: <OpenAI API 키 - 팀에서 받은 값, 채팅·Git 금지>
+      chat:
+        model: gpt-4.1-mini
+
 # Redis IAM 인증 (백엔드 PR #124). 비밀번호 대신 15분짜리 서명 토큰으로 접속
 sai:
   redis:
