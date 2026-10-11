@@ -11,9 +11,9 @@ variable "project_name" {
 }
 
 variable "environment" {
-  description = "환경 구분값입니다. 실제 팀 환경에 맞게 변경하세요."
+  description = "환경 구분값입니다. 기본값은 합성 데이터 기반 AWS 데모 환경입니다."
   type        = string
-  default     = "dev"
+  default     = "demo"
 }
 
 variable "vpc_cidr" {
@@ -118,7 +118,7 @@ variable "rds_deletion_protection" {
 variable "rds_final_snapshot_identifier" {
   description = "RDS를 의도적으로 삭제할 때 사용할 고유 final snapshot 이름입니다. 다음 삭제 전 변경하세요."
   type        = string
-  default     = "sai-dev-mariadb-final-001"
+  default     = "sai-demo-mariadb-final-001"
 }
 
 variable "redis_node_type" {

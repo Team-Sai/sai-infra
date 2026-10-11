@@ -2,6 +2,7 @@
 # 필요한 개인 설정은 terraform.tfvars (Git ignore 대상) 또는 환경 변수로 전달하세요.
 
 aws_region = "ap-northeast-2"
+environment = "demo"
 
 # 아래 2개는 형식 예시입니다. 적용 전 팀에서 실제로 사용하는 IAM 역할 ARN이나
 # IAM 사용자 ARN으로 바꾸세요. 권한 정책 ARN은 필요한 범위만 선택하세요.
