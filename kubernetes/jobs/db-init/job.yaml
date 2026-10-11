@@ -35,6 +35,9 @@ spec:
             - name: scripts
               mountPath: /scripts
               readOnly: true
+            - name: rds-ca
+              mountPath: /certs
+              readOnly: true
           resources:
             requests:
               cpu: 50m
@@ -48,3 +51,6 @@ spec:
         - name: scripts
           configMap:
             name: sai-db-init-script
+        - name: rds-ca
+          configMap:
+            name: rds-ca-bundle

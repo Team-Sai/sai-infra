@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# AWS RDS 공개 CA 인증서 묶음 → ConfigMap rds-ca-bundle
+# 앱(overlays/demo)과 DB 초기화 Job이 /certs/global-bundle.pem 으로 읽어 RDS 서버 인증서를 검증한다
+# 원본: https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem (AWS 공식, 비밀 아님)
+generatorOptions:
+  disableNameSuffixHash: true
+configMapGenerator:
+  - name: rds-ca-bundle
+    files:
+      - global-bundle.pem=rds-global-bundle.pem

@@ -22,9 +22,18 @@ ESCAPED_PW=$(printf '%s' "$DB_ADMIN_PASSWORD" | sed -e 's/\\/\\\\/g' -e 's/"/\\"
 printf '[client]\npassword="%s"\n' "$ESCAPED_PW" > "$CNF"
 unset ESCAPED_PW
 # DB_CLIENT_OPTS: TLS 옵션 등이 필요할 때만 (예: AWS RDS 인증서 옵션)
+# DB_CLIENT_OPTS: 추가 옵션이 필요할 때만
 read -r -a EXTRA <<< "${DB_CLIENT_OPTS:-}"
+
+# AWS RDS 주소면 TLS + 서버 인증서·호스트 이름 검증을 "기본으로" 켠다. (RDS는 TLS 없는 연결 거부)
+TLS_OPTS=()
+if [[ "$DB_HOST" == *.rds.amazonaws.com ]]; then
+  [[ -f /certs/global-bundle.pem ]] || { echo "RDS CA 번들(/certs/global-bundle.pem)이 없습니다. kubernetes/certs 확인"; exit 1; }
+  TLS_OPTS=(--ssl-ca=/certs/global-bundle.pem --ssl-verify-server-cert)
+fi
+
 # --defaults-extra-file 은 반드시 첫 번째 옵션이어야 함
-db() { mariadb --defaults-extra-file="$CNF" --host="$DB_HOST" --port="$DB_PORT" --user="$DB_ADMIN_USER" "${EXTRA[@]}" "$@"; }
+db() { mariadb --defaults-extra-file="$CNF" --host="$DB_HOST" --port="$DB_PORT" --user="$DB_ADMIN_USER" "${TLS_OPTS[@]}" "${EXTRA[@]}" "$@"; }
 
 # 백엔드 src/test/resources/application-test.yml 과 같은 순서 (외래 키 때문에 순서 중요)
 ORDER=(
@@ -33,11 +42,12 @@ ORDER=(
   01_loancontract.sql 02_repayment_schedule.sql 03_contractchange.sql 04_contractaccount.sql
   recurring_settlement.sql settlement.sql payment.sql settlement_account.sql
   settlement_invitation.sql settlement_participant.sql settlement_abandonment_alert.sql
-  notification.sql shedlock.sql
+  notification.sql preparation_proposal.sql repayment_preparation_event.sql shedlock.sql
 )
 
 echo "[1/5] 접속 확인: $DB_HOST:$DB_PORT"
 db -N -e "SELECT VERSION();"
+db -N -e "SHOW SESSION STATUS LIKE 'Ssl_version';"     # 빈 값이 아니면 TLS로 연결된 것
 
 echo "[2/5] DB 생성: $DB_NAME"
 db -e "CREATE DATABASE IF NOT EXISTS \`$DB_NAME\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"

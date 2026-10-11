@@ -12,9 +12,10 @@ spring:
     timeout-per-shutdown-phase: 30s
 
   datasource:
-    url: jdbc:mariadb://<terraform output rds_endpoint>:3306/sai
+    # TLS + 서버 인증서·호스트 이름 검증 (RDS는 TLS 없는 연결을 거부함). 주소는 IP가 아니라 RDS DNS endpoint
+    url: jdbc:mariadb://<terraform output rds_endpoint>:3306/sai?sslMode=verify-full&serverSslCert=/certs/global-bundle.pem
     username: sai_app                     # DB 초기화 Job이 만든 앱 계정 (DML 권한만)
-    password: <DB 초기화 Job에 넣은 APP_DB_PASSWORD>
+    password: <Secrets Manager application_db_secret_arn 의 password>
     driver-class-name: org.mariadb.jdbc.Driver
     hikari:
       maximum-pool-size: 10               # 파드 2개 × 10 = 최대 20 연결
@@ -45,11 +46,11 @@ sai:
   redis:
     iam-auth:
       enabled: true
-      replication-group-id: <Redis replication group ID>
-      user-id: <ElastiCache 앱 사용자 ID>
+      replication-group-id: <terraform output redis_replication_group_id>
+      user-id: <terraform output redis_iam_user_name>
       region: ap-northeast-2
   backend:
-    base-url: <>
+    base-url: "<브라우저가 접속하는 주소. 예: http://ALB주소 (HTTPS 적용 후 https://도메인)>"
   mock-bank:
     base-url: <백엔드가 서버끼리 부르는 목뱅크 내부 주소>
     public-base-url: <브라우저가 여는 목뱅크 주소>
@@ -63,9 +64,9 @@ file:
   storage: s3
   upload-dir: /tmp/sai-uploads            # S3 모드에서는 쓰지 않지만 설정 이름이 필요함
   s3:
-    bucket: <terraform output s3_bucket_name (파일 전용 버킷)>
+    bucket: <terraform output s3_bucket_name>
     region: ap-northeast-2
-    key-prefix: <인프라와 합의한 prefix>
+    key-prefix: exports/
 
 # ── 비밀 값: 새로 만들어 넣는다. dev와 같은 값을 쓰지 않는다 ──
 jwt:

@@ -6,6 +6,7 @@ namespace: sai
 
 resources:
   - job.yaml
+  - ../../certs
 
 # 스크립트를 ConfigMap으로 만들어 Job에 꽂음
 configMapGenerator:
