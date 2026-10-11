@@ -50,7 +50,7 @@ resource "aws_db_subnet_group" "main" {
 resource "aws_db_parameter_group" "mariadb" {
   name        = "${var.name_prefix}-mariadb-11-4"
   family      = "mariadb11.4"
-  description = "MariaDB 11.4 server defaults for the SAI application."
+  description = "MariaDB 11.4 defaults and required TLS transport for the SAI application."
 
   parameter {
     name         = "character_set_server"
@@ -62,6 +62,14 @@ resource "aws_db_parameter_group" "mariadb" {
     name         = "collation_server"
     value        = "utf8mb4_unicode_ci"
     apply_method = "pending-reboot"
+  }
+
+  # TLS를 사용하지 않는 DB 연결은 RDS가 거부하도록 합니다.
+  # 앱과 DB 초기화 Job도 CA 인증서를 확인하며 TLS로 연결해야 합니다.
+  parameter {
+    name         = "require_secure_transport"
+    value        = "ON"
+    apply_method = "immediate"
   }
 
   tags = {
@@ -135,8 +143,9 @@ resource "aws_elasticache_user" "application" {
   user_id   = "${var.name_prefix}-application"
   user_name = "${var.name_prefix}-application"
   engine    = "redis"
-  # Backend RefreshTokenService uses auth:refresh:{userId} as its Redis key.
-  access_string = "on ~auth:refresh:* -@all +@read +@write +@connection"
+  # RefreshTokenService와 상환 기능이 사용하는 키만 허용하고, Lua 스크립트는 EVAL/EVALSHA만 허용합니다.
+  # 권한 규칙은 -@all 이후에 필요한 명령만 추가합니다.
+  access_string = "on ~auth:refresh:* ~repayment:* -@all +@read +@write +@connection +eval +evalsha"
 
   authentication_mode {
     type = "iam"
