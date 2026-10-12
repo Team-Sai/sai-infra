@@ -38,11 +38,6 @@ variable "backup_bucket_arn" {
   type        = string
 }
 
-variable "application_db_secret_arn" {
-  description = "앱 DB 전용 자격 증명을 보관할 Secrets Manager ARN입니다."
-  type        = string
-}
-
 variable "redis_user_arn" {
   description = "ElastiCache IAM user ARN입니다."
   type        = string

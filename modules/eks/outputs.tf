@@ -34,7 +34,7 @@ output "session_log_group_name" {
 }
 
 output "operator_ssm_policy_arn" {
-  description = "승인된 운영자 역할에 연결할 Bastion SSM 및 EKS cluster discovery 정책 ARN입니다."
+  description = "승인된 팀원 IAM 사용자에 연결할 Bastion SSM 및 EKS cluster discovery 정책 ARN입니다."
   value       = aws_iam_policy.operator_ssm.arn
 }
 

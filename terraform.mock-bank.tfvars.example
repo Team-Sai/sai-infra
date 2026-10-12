@@ -1,0 +1,28 @@
+# Mock Bank를 데모에 포함할 때 사용하는 두 번째 단계의 변수 예시입니다.
+# 기본 인프라를 먼저 준비해 ECR 저장소를 만든 뒤 Mock Bank 이미지를 푸시하고,
+# 아래 값을 실제 값으로 채운 파일을 terraform.mock-bank.tfvars로 저장하세요.
+# 실제 .tfvars 파일은 .gitignore 대상이며, 비밀 값이나 개인 키 자체를 여기에 쓰지 마세요.
+# 실행 시 기본 terraform.tfvars와 함께 이 파일을 전달합니다.
+#
+# 필요한 준비 순서:
+# 1. 기본 Terraform 구성을 적용해 ECR 저장소를 준비합니다.
+# 2. sai-mock-bank 이미지를 ECR에 푸시하고 sha256 digest URI를 확인합니다.
+# 3. 앱 환경 비밀 JSON과 API TLS 인증서/개인 키를 각각 Secrets Manager에 등록합니다.
+# 4. 팀이 소유한 도메인과 인증서 SAN이 일치하는지 확인합니다.
+# 5. 아래 자리표시자를 실제 리소스 값으로 바꿉니다.
+#
+# Mock Bank는 사설 EC2 1대로 동작합니다. 장애 시 데모가 중단될 수 있고 무중단을 보장하지 않습니다.
+# EC2, EBS, NAT Gateway, CloudFront, WAF, 데이터 전송 및 스냅샷에 비용이 발생할 수 있습니다.
+
+enable_mock_bank = true
+
+mock_bank_image_digest = "<ACCOUNT_ID>.dkr.ecr.ap-northeast-2.amazonaws.com/sai-mock-bank@sha256:<64_HEX_DIGEST>"
+mock_bank_secret_arn = "arn:aws:secretsmanager:ap-northeast-2:<ACCOUNT_ID>:secret:<MOCK_BANK_APP_SECRET_NAME>"
+mock_bank_api_hostname = "api.mock-bank.<TEAM_OWNED_DOMAIN>"
+mock_bank_api_certificate_secret_arn = "arn:aws:secretsmanager:ap-northeast-2:<ACCOUNT_ID>:secret:<MOCK_BANK_API_TLS_SECRET_NAME>"
+
+# 사용자 지정 브라우저 도메인을 연결하려는 경우에만 아래 세 값을 채우세요.
+# 미설정 시 CloudFront 기본 도메인에서 브라우저 HTTPS를 제공합니다.
+# mock_bank_viewer_domain_name = "bank.<TEAM_OWNED_DOMAIN>"
+# mock_bank_viewer_certificate_arn = "arn:aws:acm:us-east-1:<ACCOUNT_ID>:certificate/<CERTIFICATE_ID>"
+# mock_bank_public_hosted_zone_id = "<PUBLIC_HOSTED_ZONE_ID>"

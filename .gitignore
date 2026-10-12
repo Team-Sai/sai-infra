@@ -19,6 +19,7 @@ kubeconfig
 # .tfstate files
 *.tfstate
 *.tfstate.*
+terraform.tfstate.d/
 *.tfplan
 *.plan
 *.plan.json

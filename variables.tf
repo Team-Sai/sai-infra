@@ -231,7 +231,7 @@ variable "eks_control_plane_log_retention_days" {
 
 # 선택형 Mock Bank 데모 구성. 기본값 false에서는 비용 리소스를 만들지 않습니다.
 variable "enable_mock_bank" {
-  description = "Mock Bank 별도 VPC·EC2·CloudFront 데모 구성을 활성화합니다. 비용이 발생합니다."
+  description = "첫 통합 데모에서 Mock Bank 별도 VPC·EC2·CloudFront 구성을 활성화합니다. 비용이 발생하므로 준비값을 확인한 뒤 전용 tfvars로 켭니다."
   type        = bool
   default     = false
 }

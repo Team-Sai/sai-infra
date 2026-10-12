@@ -369,6 +369,8 @@ resource "aws_eks_access_policy_association" "operator" {
 }
 
 resource "aws_eks_node_group" "initial" {
+  # App Private 서브넷(AZ)마다 노드 그룹을 하나 만들고, 각 그룹은 노드 1대를 유지합니다.
+  # 기본 AZ 2개와 서브넷 2개 기준으로 초기 Worker Node는 총 2대입니다.
   count = length(var.app_private_subnet_ids)
 
   cluster_name    = aws_eks_cluster.main.name
@@ -384,6 +386,7 @@ resource "aws_eks_node_group" "initial" {
   }
 
   scaling_config {
+    # 현재 자동 확장은 사용하지 않고 AZ마다 1대를 고정합니다.
     desired_size = 1
     min_size     = 1
     max_size     = 1
@@ -511,7 +514,7 @@ resource "aws_instance" "bastion" {
 
 resource "aws_iam_policy" "operator_ssm" {
   name        = "${var.name_prefix}-bastion-operator-ssm"
-  description = "Attach to approved human roles to start SSM Bastion shell and private EKS API forwarding sessions."
+  description = "Attach to approved individual IAM users to start SSM Bastion shell and private EKS API forwarding sessions."
 
   policy = jsonencode({
     Version = "2012-10-17"
