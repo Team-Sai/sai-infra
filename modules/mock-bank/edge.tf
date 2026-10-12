@@ -20,7 +20,7 @@ resource "aws_cloudfront_vpc_origin" "mock_bank" {
 }
 
 # AWS가 CloudFront VPC Origin을 위해 생성하는 서비스 관리형 보안 그룹을 원본 허용 출발지로 사용합니다.
-data "aws_security_groups" "cloudfront_vpc_origin" {
+data "aws_security_group" "cloudfront_vpc_origin" {
   filter {
     name   = "vpc-id"
     values = [aws_vpc.mock_bank.id]
@@ -35,10 +35,8 @@ data "aws_security_groups" "cloudfront_vpc_origin" {
 }
 
 resource "aws_vpc_security_group_ingress_rule" "cloudfront_origin" {
-  for_each = toset(data.aws_security_groups.cloudfront_vpc_origin.ids)
-
   security_group_id            = aws_security_group.mock_bank.id
-  referenced_security_group_id = each.value
+  referenced_security_group_id = data.aws_security_group.cloudfront_vpc_origin.id
   description                  = "Only this VPC's CloudFront VPC Origin may reach the browser listener"
   ip_protocol                  = "tcp"
   from_port                    = var.mock_bank_origin_port
@@ -153,6 +151,6 @@ resource "aws_cloudfront_distribution" "mock_bank" {
 
   depends_on = [
     aws_vpc_security_group_ingress_rule.cloudfront_origin,
-    aws_route53_zone_association.sai_vpc,
+    aws_route53_zone.api_private,
   ]
 }

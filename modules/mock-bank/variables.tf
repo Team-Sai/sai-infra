@@ -148,6 +148,28 @@ variable "docker_compose_version" {
   default     = "v2.29.7"
 }
 
+variable "docker_compose_sha256" {
+  description = "Docker Compose Linux x86_64 바이너리의 고정 SHA-256 체크섬입니다. 버전 변경 시 공식 체크섬과 함께 갱신해야 합니다."
+  type        = string
+  default     = "383ce6698cd5d5bbf958d2c8489ed75094e34a77d340404d9f32c4ae9e12baf0"
+
+  validation {
+    condition     = can(regex("^[0-9a-f]{64}$", var.docker_compose_sha256))
+    error_message = "Docker Compose SHA-256 체크섬은 64자리 소문자 16진수여야 합니다."
+  }
+}
+
+variable "mariadb_image" {
+  description = "MariaDB 공식 이미지의 digest 고정 URI입니다."
+  type        = string
+  default     = "mariadb@sha256:1292844148b311e4ed4300022a996d39083f415a963e970cf47cad1b3b18e3a6"
+
+  validation {
+    condition     = can(regex("^mariadb@sha256:[0-9a-f]{64}$", var.mariadb_image))
+    error_message = "MariaDB 이미지는 mariadb@sha256:<64자리 digest> 형식이어야 합니다."
+  }
+}
+
 variable "viewer_domain_name" {
   description = "선택형 브라우저 도메인입니다. 비워 두면 CloudFront 기본 도메인으로 HTTPS를 제공합니다."
   type        = string

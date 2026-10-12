@@ -82,6 +82,7 @@ resource "aws_instance" "mock_bank" {
   ami                         = data.aws_ssm_parameter.al2023_ami.value
   instance_type               = var.instance_type
   subnet_id                   = aws_subnet.private.id
+  private_ip                  = local.database_private_ip
   associate_public_ip_address = false
   vpc_security_group_ids      = [aws_security_group.mock_bank.id]
   iam_instance_profile        = aws_iam_instance_profile.mock_bank.name
@@ -103,6 +104,8 @@ resource "aws_instance" "mock_bank" {
     })
     database_volume_id     = aws_ebs_volume.database.id
     docker_compose_version = var.docker_compose_version
+    docker_compose_sha256  = var.docker_compose_sha256
+    mariadb_image          = var.mariadb_image
   })
 
   user_data_replace_on_change = true
@@ -133,7 +136,8 @@ resource "aws_instance" "mock_bank" {
 }
 
 resource "aws_volume_attachment" "database" {
-  device_name = "/dev/sdf"
-  volume_id   = aws_ebs_volume.database.id
-  instance_id = aws_instance.mock_bank.id
+  device_name                    = "/dev/sdf"
+  volume_id                      = aws_ebs_volume.database.id
+  instance_id                    = aws_instance.mock_bank.id
+  stop_instance_before_detaching = true
 }

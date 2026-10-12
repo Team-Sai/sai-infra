@@ -6,12 +6,11 @@ resource "aws_route53_zone" "api_private" {
     vpc_id = aws_vpc.mock_bank.id
   }
 
-  comment = "Private Mock Bank API name for SAI VPC peering"
-}
+  vpc {
+    vpc_id = var.main_vpc_id
+  }
 
-resource "aws_route53_zone_association" "sai_vpc" {
-  zone_id = aws_route53_zone.api_private.zone_id
-  vpc_id  = var.main_vpc_id
+  comment = "Private Mock Bank API name for SAI VPC peering"
 }
 
 resource "aws_route53_record" "api_private" {

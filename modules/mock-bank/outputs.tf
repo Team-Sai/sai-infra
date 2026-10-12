@@ -9,7 +9,7 @@ output "instance_id" {
 }
 
 output "private_ip" {
-  description = "VPC 피어링을 통해 EKS 앱에서 접근할 Mock Bank private IP입니다."
+  description = "VPC 피어링 API DNS에 연결된 고정 Mock Bank EC2 private IP입니다."
   value       = aws_instance.mock_bank.private_ip
 }
 

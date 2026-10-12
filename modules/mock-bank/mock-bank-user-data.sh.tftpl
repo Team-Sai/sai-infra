@@ -11,6 +11,7 @@ install -d -m 0755 /usr/local/lib/docker/cli-plugins
 curl --fail --silent --show-error --location \
   "https://github.com/docker/compose/releases/download/${docker_compose_version}/docker-compose-linux-x86_64" \
   --output /usr/local/lib/docker/cli-plugins/docker-compose
+echo "${docker_compose_sha256}  /usr/local/lib/docker/cli-plugins/docker-compose" | sha256sum --check --status
 chmod 0755 /usr/local/lib/docker/cli-plugins/docker-compose
 
 # EBS 볼륨은 인스턴스와 별도로 생성하며, 기존 파일시스템이 있을 때는 포맷하지 않습니다.
@@ -110,7 +111,7 @@ printf 'MOCK_BANK_API_PORT=%s\n' "${mock_bank_api_port}" >> /opt/sai-mock-bank/.
 cat > /opt/sai-mock-bank/compose.yaml <<'COMPOSE'
 services:
   mock-bank-db:
-    image: mariadb:11.4
+    image: "${mariadb_image}"
     restart: unless-stopped
     environment:
       MARIADB_DATABASE: $${DB_NAME}
