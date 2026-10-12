@@ -52,7 +52,6 @@ kubectl get nodes          # 노드 2대 Ready
 ```
 - kubectl 명령 전 항상 `kubectl config current-context` 로 kind-sai / sai-eks 를 확인한다.
 
-## 2. 설치 (EKS)
 ```bash
 kubectl config current-context        # sai-eks
 
@@ -60,19 +59,23 @@ kubectl config current-context        # sai-eks
 helm install aws-load-balancer-controller eks/aws-load-balancer-controller --version 1.14.1 -n kube-system \
   -f kubernetes/platform/aws-load-balancer-controller/values.yaml \
   --set clusterName=<terraform output eks_cluster_name> \
-  --set vpcId=<terraform output vpc_id>
-kubectl -n kube-system rollout status deploy/aws-load-balancer-controller
+  --set vpcId=<terraform output vpc_id> \
+  --wait --timeout 5m
 
-# 2) Metrics Server
+# 2) Metrics Server (--wait: 파드가 Ready가 될 때까지 기다림)
 helm install metrics-server metrics-server/metrics-server --version 3.14.0 -n kube-system \
-  -f kubernetes/platform/metrics-server/values.yaml
-kubectl top nodes
+  -f kubernetes/platform/metrics-server/values.yaml \
+  --wait --timeout 5m
+kubectl top nodes                     # 처음 수집까지 1분쯤 걸릴 수 있음 → "metrics not available"이면 잠시 후 다시
 
 # 3) Argo CD
 helm install argocd argo/argo-cd --version 10.10.2 -n argocd --create-namespace \
-  -f kubernetes/platform/argocd/values.yaml
+  -f kubernetes/platform/argocd/values.yaml \
+  --wait --timeout 10m
 kubectl -n argocd get pods            # 전부 Running
-kubectl apply -f kubernetes/platform/argocd/projects/sai.yaml    # Application보다 먼저
+
+# 4) Argo CD 프로젝트 (Application보다 반드시 먼저)
+kubectl apply -f kubernetes/platform/argocd/projects/sai.yaml
 ```
 - LB Controller 권한은 Pod Identity(kube-system/aws-load-balancer-controller)로 연결된다. 서비스 계정에 annotation을 넣지 않는다.
 - 노드 IMDS가 막혀 있어(hop limit 1) region·vpcId를 컨트롤러가 스스로 못 찾는다 → 반드시 지정.
@@ -93,7 +96,7 @@ kubectl -n argocd delete secret argocd-initial-admin-secret   # 로그인 확인
 |---|---|---|
 | 1 | `terraform apply` (Terraform 담당) → output 공유 | output 값 |
 | 2 | SSM 터널 → kubeconfig (위 1번) | `kubectl get nodes` 2대 |
-| 3 | LB Controller → Metrics Server → Argo CD (위 2번) | 파드 Running |
+| 3 | LB Controller → Metrics Server → Argo CD → Argo CD 프로젝트 (위 2번, 모두 `--wait`) | 파드 Running |
 | 4 | 이미지 ECR push (태그 = git 커밋 해시) | ECR에 태그 |
 | 5 | DB 초기화 Job (kubernetes/README.md) → Secret 삭제 | 로그: Ssl_version, 테이블 32개 |
 | 6 | 운영 설정 Secret `sai-api-config` | `kubectl -n sai get secret` |
@@ -115,23 +118,22 @@ kubectl -n argocd delete secret argocd-initial-admin-secret   # 로그인 확인
 
 ---
 
-## kind에서 연습
 ```bash
 kubectl config current-context        # kind-sai
+# Traefik은 아래 "Traefik 설정"대로 설치되어 있어야 sai-local이 Healthy가 된다
+
 helm install metrics-server metrics-server/metrics-server --version 3.14.0 -n kube-system \
   -f kubernetes/platform/metrics-server/values.yaml \
-  -f kubernetes/platform/metrics-server/values-kind.yaml
+  -f kubernetes/platform/metrics-server/values-kind.yaml \
+  --wait --timeout 5m
 helm install argocd argo/argo-cd --version 10.10.2 -n argocd --create-namespace \
-  -f kubernetes/platform/argocd/values.yaml
-kubectl apply -f kubernetes/platform/argocd/apps/sai-local.yaml
-kubectl -n argocd get application sai-local        # Synced / Healthy
+  -f kubernetes/platform/argocd/values.yaml \
+  --wait --timeout 10m
+
+# 프로젝트를 먼저 만들고 → Application (순서가 바뀌면 없는 프로젝트를 참조해 동기화되지 않음)
 kubectl apply -f kubernetes/platform/argocd/projects/sai.yaml
-```
-- LB Controller는 kind에서 동작하지 않는다. 설치값 렌더링만 확인:
-```bash
-helm template aws-load-balancer-controller eks/aws-load-balancer-controller --version 1.14.1 -n kube-system \
-  -f kubernetes/platform/aws-load-balancer-controller/values.yaml \
-  --set clusterName=test --set vpcId=vpc-test | grep -nE "cluster-name|aws-region|aws-vpc-id"
+kubectl apply -f kubernetes/platform/argocd/apps/sai-local.yaml
+kubectl -n argocd get application sai-local -w     # Synced / Healthy 가 되면 Ctrl+C (1~2분)
 ```
 - 연습 끝: `kubectl -n argocd delete application sai-local` (리소스는 남음), `helm uninstall argocd -n argocd`
 
