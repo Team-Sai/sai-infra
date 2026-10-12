@@ -1,0 +1,104 @@
+#!/bin/bash
+set -euo pipefail
+
+dnf install -y docker curl python3 awscli-2
+systemctl enable --now docker
+
+install -d -m 0700 /opt/sai-mock-bank
+install -d -m 0755 /usr/local/lib/docker/cli-plugins
+curl --fail --silent --show-error --location \
+  "https://github.com/docker/compose/releases/download/${docker_compose_version}/docker-compose-linux-x86_64" \
+  --output /usr/local/lib/docker/cli-plugins/docker-compose
+chmod 0755 /usr/local/lib/docker/cli-plugins/docker-compose
+
+AWS_REGION="${aws_region}"
+SECRET_ARN="${mock_bank_secret_arn}"
+IMAGE_URI="${mock_bank_image}"
+ECR_REGISTRY="$${IMAGE_URI%%/*}"
+aws ecr get-login-password --region "$AWS_REGION" \
+  | docker login --username AWS --password-stdin "$ECR_REGISTRY"
+
+# Secret JSON stays out of Terraform state, user data, and shell output.
+# It is converted directly into a root-only dotenv file on encrypted EBS.
+SECRET_JSON="$(aws secretsmanager get-secret-value \
+  --region "$AWS_REGION" \
+  --secret-id "$SECRET_ARN" \
+  --query SecretString \
+  --output text)"
+export SECRET_JSON
+python3 - <<'PY'
+import json
+import os
+import re
+
+required = {
+    "DB_NAME", "DB_USERNAME", "DB_PASSWORD", "DB_ROOT_PASSWORD",
+    "MOCK_BANK_KEY_HASH_SECRET", "JWT_SECRET", "LINK_IDENTITY_HASH_SECRET",
+    "LINK_STATE_SECRET", "LINK_CALLBACK_API_KEY", "PORTONE_IDENTITY_STORE_ID",
+    "PORTONE_IDENTITY_CHANNEL_KEY", "PORTONE_IDENTITY_API_SECRET",
+    "SAI_BACKEND_BASE_URL",
+}
+data = json.loads(os.environ["SECRET_JSON"])
+missing = required.difference(data)
+if missing:
+    raise SystemExit("Required Compose settings are missing from Secrets Manager.")
+with open("/opt/sai-mock-bank/.env", "w", encoding="utf-8") as env_file:
+    for key, value in data.items():
+        if not re.fullmatch(r"[A-Z0-9_]+", key):
+            raise SystemExit("Invalid environment variable name in secret.")
+        value = str(value).replace("\\", "\\\\").replace("'", "\\'").replace("\r", "\\r").replace("\n", "\\n")
+        env_file.write(f"{key}='{value}'\n")
+PY
+unset SECRET_JSON
+chmod 0600 /opt/sai-mock-bank/.env
+printf '\nMOCK_BANK_API_PORT=%s\n' "${mock_bank_api_port}" >> /opt/sai-mock-bank/.env
+
+cat > /opt/sai-mock-bank/compose.yaml <<'COMPOSE'
+services:
+  mock-bank-db:
+    image: mariadb:11.4
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: $${DB_NAME}
+      MARIADB_USER: $${DB_USERNAME}
+      MARIADB_PASSWORD: $${DB_PASSWORD}
+      MARIADB_ROOT_PASSWORD: $${DB_ROOT_PASSWORD}
+    volumes:
+      - mock-bank-db-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  mock-bank-app:
+    image: "${mock_bank_image}"
+    restart: unless-stopped
+    depends_on:
+      mock-bank-db:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SERVER_PORT: "$${MOCK_BANK_API_PORT}"
+      SPRING_DATASOURCE_URL: "jdbc:mariadb://mock-bank-db:3306/$${DB_NAME}"
+      SPRING_DATASOURCE_USERNAME: $${DB_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: $${DB_PASSWORD}
+      MOCK_BANK_KEY_HASH_SECRET: $${MOCK_BANK_KEY_HASH_SECRET}
+      JWT_SECRET: $${JWT_SECRET}
+      LINK_IDENTITY_HASH_SECRET: $${LINK_IDENTITY_HASH_SECRET}
+      LINK_STATE_SECRET: $${LINK_STATE_SECRET}
+      LINK_CALLBACK_API_KEY: $${LINK_CALLBACK_API_KEY}
+      PORTONE_IDENTITY_STORE_ID: $${PORTONE_IDENTITY_STORE_ID}
+      PORTONE_IDENTITY_CHANNEL_KEY: $${PORTONE_IDENTITY_CHANNEL_KEY}
+      PORTONE_IDENTITY_API_SECRET: $${PORTONE_IDENTITY_API_SECRET}
+      SAI_BACKEND_BASE_URL: $${SAI_BACKEND_BASE_URL}
+    ports:
+      - "$${MOCK_BANK_API_PORT}:$${MOCK_BANK_API_PORT}"
+
+volumes:
+  mock-bank-db-data:
+COMPOSE
+
+cd /opt/sai-mock-bank
+docker compose pull
+docker compose up --detach
