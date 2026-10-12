@@ -10,6 +10,7 @@ resources:
   - serviceaccount.yaml
   - pdb.yaml
   - ingress.yaml
+  - network-policy.yaml
 
 # ⚠️ 빈칸: terraform output의 ECR 주소와, ECR에 올린 이미지 태그로 바꾸기
 images:

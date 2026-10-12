@@ -28,6 +28,11 @@ output "data_private_subnet_ids" {
   value       = aws_subnet.data[*].id
 }
 
+output "data_private_subnet_cidrs" {
+  description = "NetworkPolicy에서 RDS와 ElastiCache 목적지를 제한할 때 참조하는 Data Private CIDR 목록입니다."
+  value       = aws_subnet.data[*].cidr_block
+}
+
 output "data_private_route_table_ids" {
   description = "Data Private route table ID입니다. 외부 기본 경로는 없습니다."
   value       = aws_route_table.data[*].id

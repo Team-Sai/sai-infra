@@ -268,11 +268,25 @@ kubectl -n sai create secret generic sai-api-config \
 
 ## AWS(demo) 배포 순서
 1. SSM 터널로 EKS에 kubectl 연결 → `kubectl config current-context` 확인
-2. AWS Load Balancer Controller 설치 (먼저. namespace의 readiness gate 라벨을 Controller가 처리함)
-3. DB 초기화 Job 실행 → Secret 삭제
-4. 운영 설정 Secret(sai-api-config) 생성
-5. `kubectl kustomize kubernetes/overlays/demo` 로 빈칸(ECR 주소·태그) 확인 → apply
-6. 회원가입·로그인·업로드 확인 → RDS TLS 강제 적용 → 다시 확인
+2. 네트워크 정책을 Job보다 먼저 적용합니다. `sai` namespace가 없으면 namespace부터 만듭니다.
+```bash
+kubectl apply -f kubernetes/overlays/demo/namespace.yaml
+kubectl apply -f kubernetes/overlays/demo/network-policy.yaml
+```
+3. AWS Load Balancer Controller 설치 (namespace의 readiness gate 라벨을 Controller가 처리함)
+4. DB 초기화 Job 실행 → Secret 삭제
+5. 운영 설정 Secret(sai-api-config) 생성
+6. `kubectl kustomize kubernetes/overlays/demo` 로 빈칸(ECR 주소·태그) 확인 → apply
+7. 회원가입·로그인·업로드 확인 → RDS TLS 강제 적용 → 다시 확인
+
+### Pod 송신 네트워크 정책
+- `network-policy.yaml`은 EKS demo용입니다. `sai` namespace의 Pod 송신을 기본 차단하고 DNS만 공통 허용합니다.
+- `app=sai-api`는 RDS 3306, Redis 6379, HTTPS 443, Pod Identity Agent `169.254.170.23:80`, 선택형 Mock Bank TLS API `10.251.0.0/16:8443`만 허용합니다.
+- `app=sai-db-init`는 Job이 실행될 때 RDS 3306과 공통 DNS만 사용합니다. `app=sai-web`은 DB·Redis 연결 권한이 없습니다.
+- DB/Redis 대상 CIDR은 Terraform 기본 Data Private CIDR(`10.250.3.0/24`, `10.250.13.0/24`)입니다. 실제 배포에서는 `terraform output data_private_subnet_cidrs` 결과를 확인하고 `network-policy.yaml`의 두 CIDR이 일치하는지 확인하세요. `subnet_cidrs.data`를 바꾸면 정책도 함께 바꿔야 합니다.
+- 이 정책은 Pod **송신**을 제한합니다. ALB에서 Pod로 들어오는 경로는 별도 Ingress NetworkPolicy로 제한하지 않아 기존 ALB 동작을 유지합니다. DB/Redis 보안 그룹도 계속 적용됩니다.
+- HTTPS 443은 외부 연동과 S3를 위해 모든 목적지에 허용합니다. 외부 송신 목적지를 더 좁히려면 고정 IP·VPC endpoint·방화벽 정책을 별도로 설계해야 합니다.
+- AWS VPC CNI NetworkPolicy 기능이 활성화된 EKS에서 적용됩니다. 로컬 kind overlay에는 포함하지 않았습니다.
 
 ### 주의
 - 워커 노드는 AZ별 1대씩 총 2대 기준이다. api·web 각 2개가 AZ에 나뉘어 배치된다.
