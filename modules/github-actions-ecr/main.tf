@@ -84,6 +84,13 @@ data "aws_iam_policy_document" "ecr_push_only" {
     ]
     resources = [var.ecr_repository_arns[each.key]]
   }
+
+  statement {
+    sid       = "CheckImagesInConfiguredRepositories"
+    effect    = "Allow"
+    actions   = ["ecr:DescribeImages"]
+    resources = [var.ecr_repository_arns[each.key]]
+  }
 }
 
 resource "aws_iam_role_policy" "ecr_push_only" {
