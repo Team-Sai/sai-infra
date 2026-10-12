@@ -91,6 +91,12 @@ kubectl -n argocd delete secret argocd-initial-admin-secret   # 로그인 확인
 
 ---
 
+### 목뱅크를 켤 때 (apply 2번)
+1. 1차 `terraform apply` (`enable_mock_bank = false`) → ECR 저장소 생성
+2. sai-mock-bank dev → main → Actions가 이미지 push → ECR에서 digest(`sha256:...`) 확인
+3. 2차 apply: `enable_mock_bank = true`, `mock_bank_image_digest`, API 도메인, 인증서·앱 Secret ARN
+4. 백엔드 운영 설정: `sai.mock-bank.base-url` = output `mock_bank_private_api_url`, `public-base-url` = output `mock_bank_browser_url`
+
 ## 3. 배포하는 날 순서
 | 순서 | 할 일 | 확인 |
 |---|---|---|

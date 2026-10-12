@@ -42,8 +42,10 @@
 kind create cluster --config kubernetes/overlays/local/kind-cluster.yaml
 kubectl config current-context   # kind-sai 확인
 helm repo add traefik https://traefik.github.io/charts && helm repo update
-helm install traefik traefik/traefik -n traefik --create-namespace \
-  --set service.type=NodePort --set ports.web.nodePort=30080
+helm install traefik traefik/traefik --version 41.7.0 -n traefik --create-namespace \
+  --set service.type=NodePort --set ports.web.nodePort=30080 \
+  --set providers.kubernetesIngress.publishedService.enabled=false \
+  --set "additionalArguments={--providers.kubernetesingress.ingressendpoint.ip=127.0.0.1}"
 ```
 
 ### 2. 이미지 빌드 후 kind에 넣기
@@ -301,6 +303,10 @@ kubectl apply -f kubernetes/overlays/demo/network-policy.yaml
 3. `terraform destroy`
 4. `aws secretsmanager delete-secret --secret-id <name_prefix>/database/application --force-delete-without-recovery`
    (지운 뒤 7일 동안 같은 이름으로 다시 못 만드는 문제 방지)
+5. 남는 것 정리 (Terraform이 만들지 않아 destroy 후에도 남고 비용이 나감)
+  - 목뱅크 EBS 자동 스냅샷(DLM): EC2 콘솔 → 스냅샷 → 태그 `BackupPolicy = <name_prefix>-mock-bank-database` 삭제
+  - RDS 최종 스냅샷(`rds_final_snapshot_identifier`): 필요 없으면 RDS 콘솔 → 스냅샷에서 삭제
+  - CloudFront 배포 삭제는 10분 이상 걸릴 수 있다 (destroy가 오래 걸려도 정상)
 
 ## 작업 규칙
 - 파일 작성과 Git(commit/push)은 Windows(IntelliJ·PowerShell)에서 한다.

@@ -44,7 +44,7 @@ spring:
   # AI 상환 분석·일정 에이전트 (dev 기본 설정 application.yml은 none). 데모는 가짜 데이터만 사용
   ai:
     model:
-      chat: none
+      chat: openai
     openai:
       api-key: <OpenAI API 키 - 팀에서 받은 값, 채팅·Git 금지>
       chat:
