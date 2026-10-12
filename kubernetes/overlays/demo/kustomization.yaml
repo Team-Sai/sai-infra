@@ -5,6 +5,7 @@ namespace: sai
 
 resources:
   - ../../base
+  - ../../certs
   - namespace.yaml
   - serviceaccount.yaml
   - pdb.yaml
