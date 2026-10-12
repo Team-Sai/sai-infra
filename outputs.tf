@@ -18,6 +18,11 @@ output "data_private_subnet_ids" {
   value       = module.network.data_private_subnet_ids
 }
 
+output "data_private_subnet_cidrs" {
+  description = "EKS NetworkPolicy에서 RDS·Redis 허용 대상을 맞출 Data Private CIDR 목록입니다."
+  value       = module.network.data_private_subnet_cidrs
+}
+
 output "eks_cluster_name" {
   description = "EKS 클러스터 이름입니다."
   value       = module.eks.cluster_name

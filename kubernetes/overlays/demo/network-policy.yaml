@@ -1,0 +1,103 @@
+# EKS demo 전용 Pod 송신 정책입니다. 로컬(kind) overlay에는 적용하지 않습니다.
+# 기본 정책은 sai 네임스페이스의 모든 Pod 송신을 차단하고, 아래 필요한 통신만 다시 허용합니다.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-egress
+  namespace: sai
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+---
+# DNS는 모든 sai Pod가 kube-system의 CoreDNS에 질의할 수 있어야 합니다.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns-egress
+  namespace: sai
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# sai-api만 RDS, Redis, S3/외부 HTTPS API, Pod Identity Agent를 사용합니다.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-sai-api-egress
+  namespace: sai
+spec:
+  podSelector:
+    matchLabels:
+      app: sai-api
+  policyTypes:
+    - Egress
+  egress:
+    # Terraform 기본 Data Private CIDR입니다. subnet_cidrs.data를 바꾸면 이 CIDR도 맞춰 주세요.
+    - to:
+        - ipBlock:
+            cidr: 10.250.3.0/24
+        - ipBlock:
+            cidr: 10.250.13.0/24
+      ports:
+        - protocol: TCP
+          port: 3306
+        - protocol: TCP
+          port: 6379
+    # S3와 PortOne 등 외부 HTTPS 연동. 목적지 IP가 변동되므로 포트 443만 허용합니다.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - protocol: TCP
+          port: 443
+    # EKS Pod Identity Agent에서 S3 권한과 ElastiCache IAM 토큰용 임시 자격 증명을 받습니다.
+    - to:
+        - ipBlock:
+            cidr: 169.254.170.23/32
+      ports:
+        - protocol: TCP
+          port: 80
+    # 선택형 Mock Bank 연동의 사설 TLS API입니다. Mock Bank CIDR 변경 시 함께 수정합니다.
+    - to:
+        - ipBlock:
+            cidr: 10.251.0.0/16
+      ports:
+        - protocol: TCP
+          port: 8443
+---
+# DB 초기화 Job은 실행되는 동안만 RDS 3306과 DNS가 필요합니다.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-sai-db-init-egress
+  namespace: sai
+spec:
+  podSelector:
+    matchLabels:
+      app: sai-db-init
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 10.250.3.0/24
+        - ipBlock:
+            cidr: 10.250.13.0/24
+      ports:
+        - protocol: TCP
+          port: 3306
