@@ -49,7 +49,7 @@ output "operator_access_principal_arns" {
 }
 
 output "bastion_operator_ssm_policy_arn" {
-  description = "팀원 Identity Center 역할에 연결할 Bastion 전용 SSM 정책 ARN입니다."
+  description = "팀원별 IAM 사용자에 연결할 Bastion 전용 SSM 정책 ARN입니다. 실제 사용자 생성과 정책 연결은 계정 관리자가 수행합니다."
   value       = module.eks.operator_ssm_policy_arn
 }
 

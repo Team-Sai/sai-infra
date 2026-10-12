@@ -50,7 +50,8 @@ module "storage" {
   ]
 }
 
-# Mock Bank는 별도 비용이 드는 선택 구성입니다. 필요한 값이 준비된 뒤 활성화합니다.
+# Mock Bank는 첫 통합 데모에 포함하되, ECR 이미지 digest와 Secrets Manager 항목 등
+# 필수 값은 기본 인프라를 준비한 뒤 전용 tfvars에서 설정해 활성화합니다. 비용이 발생합니다.
 module "mock_bank" {
   count  = var.enable_mock_bank ? 1 : 0
   source = "./modules/mock-bank"
@@ -101,7 +102,6 @@ module "iam" {
   load_balancer_controller_namespace       = var.load_balancer_controller_namespace
   load_balancer_controller_service_account = var.load_balancer_controller_service_account
   backup_bucket_arn                        = module.storage.backup_bucket_arn
-  application_db_secret_arn                = module.data.application_db_secret_arn
   redis_user_arn                           = module.data.redis_user_arn
   redis_replication_group_arn              = module.data.redis_replication_group_arn
 

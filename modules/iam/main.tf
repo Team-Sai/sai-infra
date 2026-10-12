@@ -26,7 +26,7 @@ resource "aws_iam_role" "application" {
 
 resource "aws_iam_policy" "application" {
   name        = "${var.name_prefix}-application-data-access"
-  description = "App pod access to its S3 file prefix and IAM-authenticated Redis user."
+  description = "App pod access to its S3 file prefix and IAM-authenticated Redis user; database credentials are injected as a Kubernetes Secret."
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -51,12 +51,6 @@ resource "aws_iam_policy" "application" {
           "s3:PutObject",
         ]
         Resource = "${var.backup_bucket_arn}/exports/*"
-      },
-      {
-        Sid      = "ReadApplicationDatabaseSecret"
-        Effect   = "Allow"
-        Action   = ["secretsmanager:GetSecretValue"]
-        Resource = var.application_db_secret_arn
       },
       {
         Sid      = "ConnectToRedisAsApplicationUser"

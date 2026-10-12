@@ -1,22 +1,36 @@
 # 이 파일은 예시입니다. 비밀번호, access key, 실제 계정 ID를 넣지 마세요.
 # 필요한 개인 설정은 terraform.tfvars (Git ignore 대상) 또는 환경 변수로 전달하세요.
+# 이 저장소의 Terraform은 AWS Organizations나 Control Tower를 만들거나 활성화하지 않습니다.
+# 크레딧 자격 영향 가능성을 피하기로 한 팀 결정에 따라 AWS 계정은 독립 계정으로 유지하세요.
 
 aws_region = "ap-northeast-2"
 environment = "demo"
 
-# 아래 2개는 형식 예시입니다. 적용 전 팀에서 실제로 사용하는 IAM 역할 ARN이나
-# IAM 사용자 ARN으로 바꾸세요. 권한 정책 ARN은 필요한 범위만 선택하세요.
+# 기본 인프라 구성 단계에서는 Mock Bank를 끕니다.
+# ECR에 이미지를 올리고 비밀 값·TLS 인증서를 준비한 뒤,
+# terraform.mock-bank.tfvars.example을 별도 로컬 tfvars로 복사해 Mock Bank 단계에 사용하세요.
+enable_mock_bank = false
+
+# 팀원별 AWS IAM 사용자는 AWS 계정 관리자가 별도로 만들고 MFA를 켭니다.
+# 각자 계정은 공유하지 않습니다. 필요한 자격 증명은 로컬 AWS CLI 프로필에만 두고,
+# access key/secret key는 코드, 이 파일, GitHub 저장소에 넣지 마세요.
+# 아래 ARN은 자리표시자입니다. 적용 전 실제 계정 ID와 팀원별 IAM 사용자 이름으로 바꾸세요.
+# 앱 Namespace 안에서 작업하는 운영자 예시이며, 클러스터 전체 관리자 권한은 기본으로 주지 않습니다.
+# Bastion/SSM 접속 권한은 apply 후 output의 bastion_operator_ssm_policy_arn을
+# 각 팀원 IAM 사용자에 계정 관리자가 연결해야 합니다. 이 EKS 설정만으로 SSM 권한까지 생기지는 않습니다.
 operator_access_entries = {
   kubernetes_operator_1 = {
-    principal_arn = "arn:aws:iam::<ACCOUNT_ID>:role/<TEAM_OPERATOR_ROLE_1>"
-    policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
-    scope_type    = "cluster"
+    principal_arn = "arn:aws:iam::<ACCOUNT_ID>:user/<TEAM_OPERATOR_IAM_USER_1>"
+    policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSAdminPolicy"
+    scope_type    = "namespace"
+    namespaces    = ["sai"]
     run_as_user   = "sai-operator-1"
   }
   kubernetes_operator_2 = {
-    principal_arn = "arn:aws:iam::<ACCOUNT_ID>:role/<TEAM_OPERATOR_ROLE_2>"
-    policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
-    scope_type    = "cluster"
+    principal_arn = "arn:aws:iam::<ACCOUNT_ID>:user/<TEAM_OPERATOR_IAM_USER_2>"
+    policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSAdminPolicy"
+    scope_type    = "namespace"
+    namespaces    = ["sai"]
     run_as_user   = "sai-operator-2"
   }
 }
