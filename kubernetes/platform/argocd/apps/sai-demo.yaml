@@ -1,0 +1,25 @@
+# AWS: main 브랜치의 overlays/demo 를 자동 배포
+# - main을 보는 이유: dev에 머지될 때마다 발표 환경이 바뀌지 않게. "dev → main PR"이 곧 배포
+# 먼저 준비할 것: projects/sai.yaml, LB Controller 설치, DB 초기화 Job, Secret(sai-api-config), demo의 ECR 주소·태그
+# DB 초기화 Job(kubernetes/jobs/db-init)은 Argo CD가 관리하지 않는다 (필요할 때 직접 실행)
+# finalizer를 넣지 않음: Application을 지워도 리소스는 남는다 (지울 때는 README "내릴 때" 순서대로)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: sai-demo
+  namespace: argocd
+spec:
+  project: sai
+  source:
+    repoURL: https://github.com/Team-Sai/sai-infra.git
+    targetRevision: main
+    path: kubernetes/overlays/demo
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: sai
+  syncPolicy:
+    automated:
+      prune: true        # Git에서 지운 리소스는 클러스터에서도 지움
+      selfHeal: true     # 손으로 바꾼 것은 Git 상태로 되돌림
+    syncOptions:
+      - PruneLast=true   # 새 리소스를 먼저 만들고, 지울 것은 마지막에 지움
