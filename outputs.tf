@@ -169,3 +169,13 @@ output "mock_bank_private_ip" {
   description = "VPC Peering 내부 API DNS가 가리키는 고정 사설 IP입니다. 비활성화 시 null입니다."
   value       = var.enable_mock_bank ? module.mock_bank[0].private_ip : null
 }
+
+output "github_actions_ecr_push_role_arns" {
+  description = "ECR 저장소 이름별 GitHub Actions AWS_ROLE_ARN map입니다. 각 앱 GitHub 저장소는 대응하는 map 항목을 사용합니다. 값은 apply 후 생성됩니다."
+  value       = module.github_actions_ecr.role_arns
+}
+
+output "github_oidc_provider_arn" {
+  description = "GitHub Actions OIDC identity provider ARN입니다. 이미 등록된 provider를 입력한 경우 그 ARN을 반환합니다."
+  value       = module.github_actions_ecr.oidc_provider_arn
+}

@@ -79,6 +79,17 @@ module "mock_bank" {
   public_hosted_zone_id                = var.mock_bank_public_hosted_zone_id
 }
 
+# GitHub Actions가 장기 AWS 키 없이 OIDC로 임시 자격 증명을 받아,
+# 위에서 만든 ECR 저장소에만 이미지를 올리도록 역할을 구성합니다.
+module "github_actions_ecr" {
+  source = "./modules/github-actions-ecr"
+
+  name_prefix                 = local.name_prefix
+  github_actions_ecr_subjects = var.github_actions_ecr_subjects
+  existing_oidc_provider_arn  = var.github_oidc_provider_arn
+  ecr_repository_arns         = module.storage.ecr_repository_arns
+}
+
 module "iam" {
   source = "./modules/iam"
 
