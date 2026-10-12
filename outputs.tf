@@ -140,6 +140,36 @@ output "load_balancer_controller_role_arn" {
   value       = module.iam.load_balancer_controller_role_arn
 }
 
+output "mock_bank_browser_url" {
+  description = "Mock Bank 브라우저 화면 HTTPS 주소입니다. 모듈이 비활성화되면 null입니다."
+  value       = var.enable_mock_bank ? module.mock_bank[0].browser_url : null
+}
+
+output "mock_bank_private_api_url" {
+  description = "SAI 백엔드가 VPC Peering과 TLS로 호출할 Mock Bank 내부 API 주소입니다. 모듈이 비활성화되면 null입니다."
+  value       = var.enable_mock_bank ? module.mock_bank[0].private_api_url : null
+}
+
+output "mock_bank_vpc_id" {
+  description = "선택 모듈에서 생성하는 Mock Bank 전용 VPC ID입니다. 비활성화 시 null입니다."
+  value       = var.enable_mock_bank ? module.mock_bank[0].vpc_id : null
+}
+
+output "mock_bank_private_subnet_ids" {
+  description = "Mock Bank EC2가 배치되는 사설 서브넷 ID 목록입니다. 비활성화 시 빈 목록입니다."
+  value       = var.enable_mock_bank ? module.mock_bank[0].private_subnet_ids : []
+}
+
+output "mock_bank_instance_id" {
+  description = "Mock Bank 단일 EC2 instance ID입니다. 비활성화 시 null입니다."
+  value       = var.enable_mock_bank ? module.mock_bank[0].instance_id : null
+}
+
+output "mock_bank_private_ip" {
+  description = "VPC Peering 내부 API DNS가 가리키는 고정 사설 IP입니다. 비활성화 시 null입니다."
+  value       = var.enable_mock_bank ? module.mock_bank[0].private_ip : null
+}
+
 output "github_actions_ecr_push_role_arns" {
   description = "ECR 저장소 이름별 GitHub Actions AWS_ROLE_ARN map입니다. 각 앱 GitHub 저장소는 대응하는 map 항목을 사용합니다. 값은 apply 후 생성됩니다."
   value       = module.github_actions_ecr.role_arns

@@ -156,4 +156,3 @@ helm upgrade traefik traefik/traefik --version 41.7.0 -n traefik --reuse-values 
 kubectl -n sai get ingress      # ADDRESS 127.0.0.1
 ```
 - `publishedService`(차트 기본값)가 켜져 있으면 그쪽이 먼저 쓰여서 주소가 비어 버린다. 반드시 끈다.
-

@@ -20,3 +20,13 @@ provider "aws" {
     tags = local.common_tags
   }
 }
+
+# CloudFront 범위 WAF와 사용자 지정 CloudFront 인증서는 us-east-1을 사용합니다.
+provider "aws" {
+  alias  = "us_east_1"
+  region = "us-east-1"
+
+  default_tags {
+    tags = local.common_tags
+  }
+}

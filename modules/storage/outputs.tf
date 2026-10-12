@@ -14,6 +14,6 @@ output "ecr_repository_urls" {
 }
 
 output "ecr_repository_arns" {
-  description = "ECR 저장소별 ARN map입니다. GitHub Actions push 역할을 해당 저장소에만 제한할 때 사용합니다."
+  description = "ECR 저장소별 ARN map입니다. 앱 실행 역할의 pull 권한과 GitHub Actions push 역할의 최소 권한 범위에 사용합니다."
   value       = { for name, repository in aws_ecr_repository.application : name => repository.arn }
 }
