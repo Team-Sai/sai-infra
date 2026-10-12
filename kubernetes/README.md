@@ -42,8 +42,6 @@
 kind create cluster --config kubernetes/overlays/local/kind-cluster.yaml
 kubectl config current-context   # kind-sai 확인
 helm repo add traefik https://traefik.github.io/charts && helm repo update
-helm install traefik traefik/traefik -n traefik --create-namespace \
-  --set service.type=NodePort --set ports.web.nodePort=30080
 helm install traefik traefik/traefik --version 41.7.0 -n traefik --create-namespace \
   --set service.type=NodePort --set ports.web.nodePort=30080 \
   --set providers.kubernetesIngress.publishedService.enabled=false \
