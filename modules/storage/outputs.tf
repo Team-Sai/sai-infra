@@ -12,3 +12,8 @@ output "ecr_repository_urls" {
   description = "ECR 저장소별 push/pull URL map입니다."
   value       = { for name, repository in aws_ecr_repository.application : name => repository.repository_url }
 }
+
+output "ecr_repository_arns" {
+  description = "ECR 저장소별 ARN map입니다. 각 실행 역할의 최소 권한 pull 정책에 사용합니다."
+  value       = { for name, repository in aws_ecr_repository.application : name => repository.arn }
+}

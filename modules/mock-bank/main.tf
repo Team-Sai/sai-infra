@@ -1,8 +1,43 @@
-data "aws_ssm_parameter" "al2023_ami" {
-  name = "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64"
+locals {
+  public_subnet_cidr  = cidrsubnet(var.mock_vpc_cidr, 8, 1)
+  private_subnet_cidr = cidrsubnet(var.mock_vpc_cidr, 8, 2)
+  database_private_ip = cidrhost(local.private_subnet_cidr, 10)
+  data_volume_tag     = "${var.name_prefix}-mock-bank-database"
+
+  # Terraform has no cidrcontains function. Convert both IPv4 CIDR boundaries to integers for overlap checks.
+  mock_vpc_start_octets = [for octet in split(".", cidrhost(var.mock_vpc_cidr, 0)) : tonumber(octet)]
+  mock_vpc_end_octets   = [for octet in split(".", cidrhost(var.mock_vpc_cidr, -1)) : tonumber(octet)]
+  main_vpc_start_octets = [for octet in split(".", cidrhost(var.main_vpc_cidr, 0)) : tonumber(octet)]
+  main_vpc_end_octets   = [for octet in split(".", cidrhost(var.main_vpc_cidr, -1)) : tonumber(octet)]
+  mock_vpc_start        = sum([for index, octet in local.mock_vpc_start_octets : octet * pow(256, 3 - index)])
+  mock_vpc_end          = sum([for index, octet in local.mock_vpc_end_octets : octet * pow(256, 3 - index)])
+  main_vpc_start        = sum([for index, octet in local.main_vpc_start_octets : octet * pow(256, 3 - index)])
+  main_vpc_end          = sum([for index, octet in local.main_vpc_end_octets : octet * pow(256, 3 - index)])
 }
 
-data "aws_partition" "current" {}
+# 사용자 지정 브라우저 도메인 입력 누락을 apply 전에 차단합니다.
+resource "terraform_data" "configuration_guard" {
+  input = var.mock_vpc_cidr
+
+  lifecycle {
+    precondition {
+      condition     = local.mock_vpc_start > local.main_vpc_end || local.main_vpc_start > local.mock_vpc_end
+      error_message = "Mock Bank VPC CIDR은 SAI 주 VPC CIDR과 겹치면 안 됩니다. VPC Peering 라우팅이 동작하지 않습니다."
+    }
+
+    precondition {
+      condition = (
+        var.viewer_domain_name == null
+        ? var.viewer_certificate_arn == null && var.public_hosted_zone_id == null
+        : can(regex(
+          "^arn:aws:acm:us-east-1:[0-9]{12}:certificate/.+$",
+          coalesce(var.viewer_certificate_arn, "")
+        )) && var.public_hosted_zone_id != null
+      )
+      error_message = "사용자 지정 브라우저 도메인에는 us-east-1 ACM 인증서 ARN과 Route 53 공개 Hosted Zone ID가 필요합니다."
+    }
+  }
+}
 
 resource "aws_vpc" "mock_bank" {
   cidr_block           = var.mock_vpc_cidr
@@ -12,8 +47,12 @@ resource "aws_vpc" "mock_bank" {
   tags = {
     Name = "${var.name_prefix}-mock-bank-vpc"
   }
+
+  depends_on = [terraform_data.configuration_guard]
 }
 
+# CloudFront VPC Origin이 이 VPC의 사설 EC2를 원본으로 사용할 수 있도록 IGW를 연결합니다.
+# EC2가 있는 private subnet에는 IGW 기본 경로를 만들지 않습니다.
 resource "aws_internet_gateway" "mock_bank" {
   vpc_id = aws_vpc.mock_bank.id
 
@@ -22,18 +61,29 @@ resource "aws_internet_gateway" "mock_bank" {
   }
 }
 
-resource "aws_subnet" "mock_bank" {
+resource "aws_subnet" "public" {
   vpc_id                  = aws_vpc.mock_bank.id
   availability_zone       = var.mock_availability_zone
-  cidr_block              = cidrsubnet(var.mock_vpc_cidr, 8, 1)
+  cidr_block              = local.public_subnet_cidr
   map_public_ip_on_launch = false
 
   tags = {
-    Name = "${var.name_prefix}-mock-bank-subnet"
+    Name = "${var.name_prefix}-mock-bank-nat-public"
   }
 }
 
-resource "aws_route_table" "mock_bank" {
+resource "aws_subnet" "private" {
+  vpc_id                  = aws_vpc.mock_bank.id
+  availability_zone       = var.mock_availability_zone
+  cidr_block              = local.private_subnet_cidr
+  map_public_ip_on_launch = false
+
+  tags = {
+    Name = "${var.name_prefix}-mock-bank-private"
+  }
+}
+
+resource "aws_route_table" "public" {
   vpc_id = aws_vpc.mock_bank.id
 
   route {
@@ -42,13 +92,50 @@ resource "aws_route_table" "mock_bank" {
   }
 
   tags = {
-    Name = "${var.name_prefix}-mock-bank-rt"
+    Name = "${var.name_prefix}-mock-bank-public-rt"
   }
 }
 
-resource "aws_route_table_association" "mock_bank" {
-  subnet_id      = aws_subnet.mock_bank.id
-  route_table_id = aws_route_table.mock_bank.id
+resource "aws_route_table_association" "public" {
+  subnet_id      = aws_subnet.public.id
+  route_table_id = aws_route_table.public.id
+}
+
+resource "aws_eip" "nat" {
+  domain = "vpc"
+
+  tags = {
+    Name = "${var.name_prefix}-mock-bank-nat-eip"
+  }
+}
+
+resource "aws_nat_gateway" "mock_bank" {
+  allocation_id = aws_eip.nat.id
+  subnet_id     = aws_subnet.public.id
+
+  tags = {
+    Name = "${var.name_prefix}-mock-bank-nat"
+  }
+
+  depends_on = [aws_internet_gateway.mock_bank]
+}
+
+resource "aws_route_table" "private" {
+  vpc_id = aws_vpc.mock_bank.id
+
+  route {
+    cidr_block     = "0.0.0.0/0"
+    nat_gateway_id = aws_nat_gateway.mock_bank.id
+  }
+
+  tags = {
+    Name = "${var.name_prefix}-mock-bank-private-rt"
+  }
+}
+
+resource "aws_route_table_association" "private" {
+  subnet_id      = aws_subnet.private.id
+  route_table_id = aws_route_table.private.id
 }
 
 resource "aws_vpc_peering_connection" "main" {
@@ -61,6 +148,7 @@ resource "aws_vpc_peering_connection" "main" {
   }
 }
 
+# SAI App Private 서브넷에서만 Mock Bank 내부 TLS API로 이동할 수 있도록 라우팅합니다.
 resource "aws_route" "main_to_mock_bank" {
   count = length(var.main_app_route_table_ids)
 
@@ -70,18 +158,18 @@ resource "aws_route" "main_to_mock_bank" {
 }
 
 resource "aws_route" "mock_bank_to_main" {
-  route_table_id            = aws_route_table.mock_bank.id
+  route_table_id            = aws_route_table.private.id
   destination_cidr_block    = var.main_vpc_cidr
   vpc_peering_connection_id = aws_vpc_peering_connection.main.id
 }
 
 resource "aws_security_group" "mock_bank" {
   name        = "${var.name_prefix}-mock-bank"
-  description = "Mock Bank API from EKS App Private subnets only; no inbound SSH."
+  description = "CloudFront VPC Origin web traffic and SAI App Private TLS API only; no SSH."
   vpc_id      = aws_vpc.mock_bank.id
 
   egress {
-    description = "SSM, ECR, and package downloads via Internet Gateway"
+    description = "AWS APIs and package downloads through the private subnet NAT route"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
@@ -93,97 +181,15 @@ resource "aws_security_group" "mock_bank" {
   }
 }
 
-resource "aws_vpc_security_group_ingress_rule" "app_subnets" {
+resource "aws_vpc_security_group_ingress_rule" "app_subnets_api" {
   for_each = toset(var.main_app_subnet_cidrs)
 
   security_group_id = aws_security_group.mock_bank.id
   cidr_ipv4         = each.value
-  description       = "Mock Bank API from an EKS App Private subnet"
+  description       = "SAI App Private subnet to Mock Bank TLS API"
   ip_protocol       = "tcp"
   from_port         = var.mock_bank_api_port
   to_port           = var.mock_bank_api_port
 }
 
-resource "aws_iam_role" "mock_bank" {
-  name = "${var.name_prefix}-mock-bank-ec2-role"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect    = "Allow"
-      Principal = { Service = "ec2.amazonaws.com" }
-      Action    = "sts:AssumeRole"
-    }]
-  })
-}
-
-resource "aws_iam_role_policy_attachment" "mock_bank_ssm" {
-  role       = aws_iam_role.mock_bank.name
-  policy_arn = "arn:${data.aws_partition.current.partition}:iam::aws:policy/AmazonSSMManagedInstanceCore"
-}
-
-resource "aws_iam_role_policy_attachment" "mock_bank_ecr" {
-  role       = aws_iam_role.mock_bank.name
-  policy_arn = "arn:${data.aws_partition.current.partition}:iam::aws:policy/AmazonEC2ContainerRegistryPullOnly"
-}
-
-resource "aws_iam_role_policy" "mock_bank_secret" {
-  name = "${var.name_prefix}-mock-bank-read-config"
-  role = aws_iam_role.mock_bank.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect   = "Allow"
-      Action   = ["secretsmanager:GetSecretValue"]
-      Resource = var.mock_bank_secret_arn
-    }]
-  })
-}
-
-resource "aws_iam_instance_profile" "mock_bank" {
-  name = "${var.name_prefix}-mock-bank-profile"
-  role = aws_iam_role.mock_bank.name
-}
-
-resource "aws_instance" "mock_bank" {
-  ami                         = data.aws_ssm_parameter.al2023_ami.value
-  instance_type               = var.instance_type
-  subnet_id                   = aws_subnet.mock_bank.id
-  vpc_security_group_ids      = [aws_security_group.mock_bank.id]
-  iam_instance_profile        = aws_iam_instance_profile.mock_bank.name
-  associate_public_ip_address = true
-
-  user_data = templatefile("${path.module}/mock-bank-user-data.sh.tftpl", {
-    aws_region             = var.aws_region
-    mock_bank_image        = var.mock_bank_image
-    mock_bank_secret_arn   = var.mock_bank_secret_arn
-    mock_bank_api_port     = var.mock_bank_api_port
-    docker_compose_version = var.docker_compose_version
-  })
-
-  user_data_replace_on_change = true
-
-  metadata_options {
-    http_endpoint               = "enabled"
-    http_tokens                 = "required"
-    http_put_response_hop_limit = 1
-  }
-
-  root_block_device {
-    encrypted   = true
-    volume_type = "gp3"
-    volume_size = var.root_volume_size_gib
-  }
-
-  tags = {
-    Name = "${var.name_prefix}-mock-bank"
-  }
-
-  depends_on = [
-    aws_iam_role_policy_attachment.mock_bank_ssm,
-    aws_iam_role_policy_attachment.mock_bank_ecr,
-    aws_iam_role_policy.mock_bank_secret,
-    aws_route.mock_bank_to_main,
-  ]
-}
+# TCP 8080은 CloudFront VPC Origin 보안 그룹 규칙을 만든 뒤 edge.tf에서만 허용합니다.

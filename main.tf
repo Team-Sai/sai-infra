@@ -50,6 +50,35 @@ module "storage" {
   ]
 }
 
+# Mock Bank는 별도 비용이 드는 선택 구성입니다. 필요한 값이 준비된 뒤 활성화합니다.
+module "mock_bank" {
+  count  = var.enable_mock_bank ? 1 : 0
+  source = "./modules/mock-bank"
+
+  providers = {
+    aws           = aws
+    aws.us_east_1 = aws.us_east_1
+  }
+
+  name_prefix                          = local.name_prefix
+  aws_region                           = var.aws_region
+  main_vpc_id                          = module.network.vpc_id
+  main_vpc_cidr                        = var.vpc_cidr
+  main_app_route_table_ids             = module.network.app_private_route_table_ids
+  main_app_subnet_cidrs                = module.network.app_private_subnet_cidrs
+  mock_bank_image                      = var.mock_bank_image_digest
+  mock_bank_secret_arn                 = var.mock_bank_secret_arn
+  mock_bank_api_hostname               = var.mock_bank_api_hostname
+  mock_bank_api_certificate_secret_arn = var.mock_bank_api_certificate_secret_arn
+  mock_bank_ecr_repository_arn         = module.storage.ecr_repository_arns["sai-mock-bank"]
+  instance_type                        = var.mock_bank_instance_type
+  data_volume_size_gib                 = var.mock_bank_data_volume_size_gib
+  snapshot_retention_count             = var.mock_bank_snapshot_retention_count
+  viewer_domain_name                   = var.mock_bank_viewer_domain_name
+  viewer_certificate_arn               = var.mock_bank_viewer_certificate_arn
+  public_hosted_zone_id                = var.mock_bank_public_hosted_zone_id
+}
+
 module "iam" {
   source = "./modules/iam"
 

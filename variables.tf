@@ -228,3 +228,87 @@ variable "eks_control_plane_log_retention_days" {
     error_message = "CloudWatch Logs retention에는 AWS에서 지원하는 보존 기간을 지정해야 합니다."
   }
 }
+
+# 선택형 Mock Bank 데모 구성. 기본값 false에서는 비용 리소스를 만들지 않습니다.
+variable "enable_mock_bank" {
+  description = "Mock Bank 별도 VPC·EC2·CloudFront 데모 구성을 활성화합니다. 비용이 발생합니다."
+  type        = bool
+  default     = false
+}
+
+variable "mock_bank_image_digest" {
+  description = "sai-mock-bank ECR 이미지의 digest 고정 URI입니다. tag가 아닌 @sha256:<64자리> 형식이어야 합니다."
+  type        = string
+  default     = null
+  nullable    = true
+}
+
+variable "mock_bank_secret_arn" {
+  description = "Mock Bank Compose 환경변수 JSON을 담은 Secrets Manager ARN입니다. 실제 secret 값은 Terraform에 넣지 않습니다."
+  type        = string
+  default     = null
+  nullable    = true
+}
+
+variable "mock_bank_api_hostname" {
+  description = "VPC Peering 내부 API TLS 인증서에 포함될 팀 소유 도메인 이름입니다. Private Hosted Zone 이름으로도 사용합니다."
+  type        = string
+  default     = null
+  nullable    = true
+}
+
+variable "mock_bank_api_certificate_secret_arn" {
+  description = "TLS_CERTIFICATE_PEM과 TLS_PRIVATE_KEY_PEM 키를 가진 Secrets Manager ARN입니다. 실제 인증서·개인 키는 Terraform에 넣지 않습니다."
+  type        = string
+  default     = null
+  nullable    = true
+}
+
+variable "mock_bank_instance_type" {
+  description = "Mock Bank 단일 EC2 사양입니다. 작은 데모 기본값이며 용량·성능을 보장하지 않습니다."
+  type        = string
+  default     = "t3.small"
+}
+
+variable "mock_bank_data_volume_size_gib" {
+  description = "Mock Bank MariaDB 전용 암호화 EBS 데이터 볼륨 크기(GB)입니다."
+  type        = number
+  default     = 20
+
+  validation {
+    condition     = var.mock_bank_data_volume_size_gib >= 20 && var.mock_bank_data_volume_size_gib <= 16384
+    error_message = "Mock Bank 데이터 볼륨은 20 GiB 이상 16,384 GiB 이하여야 합니다."
+  }
+}
+
+variable "mock_bank_snapshot_retention_count" {
+  description = "Mock Bank EBS 자동 스냅샷 보존 개수입니다. 기본 일일 스냅샷 7개이며 저장 비용이 발생합니다."
+  type        = number
+  default     = 7
+
+  validation {
+    condition     = var.mock_bank_snapshot_retention_count >= 1 && var.mock_bank_snapshot_retention_count <= 1000
+    error_message = "스냅샷 보존 개수는 1 이상 1,000 이하여야 합니다."
+  }
+}
+
+variable "mock_bank_viewer_domain_name" {
+  description = "선택 사항인 Mock Bank 사용자 브라우저 도메인입니다. 비워 두면 CloudFront 기본 도메인을 사용합니다."
+  type        = string
+  default     = null
+  nullable    = true
+}
+
+variable "mock_bank_viewer_certificate_arn" {
+  description = "사용자 지정 CloudFront 도메인용 ACM 인증서 ARN입니다. us-east-1 인증서여야 합니다."
+  type        = string
+  default     = null
+  nullable    = true
+}
+
+variable "mock_bank_public_hosted_zone_id" {
+  description = "사용자 지정 브라우저 도메인의 Route 53 공개 Hosted Zone ID입니다. 해당 도메인을 쓸 때만 입력합니다."
+  type        = string
+  default     = null
+  nullable    = true
+}
