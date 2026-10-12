@@ -66,5 +66,8 @@ kubernetes/**/*.secret.yaml
 kubernetes/**/application*.yml
 !kubernetes/**/secret.example.yaml
 !kubernetes/**/application.example.yml
+!kubernetes/**/application-*.example.yml
 
+#로컬 Secret 값 파일 (kubectl create secret --from-env-file용)
 kubernetes/**/*.env
+!kubernetes/certs/rds-*.pem
