@@ -78,7 +78,7 @@ kubectl -n sai create secret generic sai-api-config \
 kubectl -n sai get secret   # 2개 보이면 성공
 ```
 - application-dev.yml의 `spring.sql.init.schema-locations`는 아래 "DB 초기화 Job"의 테이블 순서와 **같아야** 빈 DB에서 테이블이 생성된다.
-  (`notification.sql` 다음에 `preparation_proposal.sql`, `repayment_preparation_event.sql`, 마지막에 `shedlock.sql`)
+  (`notification.sql` 다음, 마지막에 `shedlock.sql`)
 - DB·Redis 주소와 비밀번호는 overlays/local/api-local-patch.yaml의 환경 변수가 yml 값을 덮어쓴다.
 - 로컬 DB를 처음 만든 뒤 Spring Batch 저장소 테이블(BATCH_*)을 **한 번** 만든다.
   백엔드가 `@EnableJdbcJobRepository`로 배치를 직접 설정해서, yml의 `spring.batch.jdbc.initialize-schema: always`가 동작하지 않는다.
@@ -132,7 +132,7 @@ kind delete cluster --name sai     # 완전히 삭제
 앱 계정은 데이터 읽기·쓰기(DML) 권한만 있어서 테이블을 만들 수 없다.
 배포 전에 이 Job을 관리자 계정으로 **한 번** 실행한다. (다시 실행해도 안전)
 
-하는 일: 접속 확인(TLS 버전 출력) → DB 생성(utf8mb4) → 앱 테이블 23개(정해진 순서) → BATCH_ 테이블(없을 때만) → 앱 계정 생성·DML 권한
+하는 일: 접속 확인(TLS 버전 출력) → DB 생성(utf8mb4) → 앱 테이블 21개(정해진 순서) → BATCH_ 테이블(없을 때만) → 앱 계정 생성·DML 권한
 
 ### 1. 테이블 SQL을 ConfigMap으로
 백엔드는 **배포할 이미지와 같은 커밋**으로 체크아웃되어 있어야 한다.
@@ -223,7 +223,7 @@ kubectl apply -k kubernetes/jobs/db-init
 kubectl -n sai wait --for=condition=complete job/sai-db-init --timeout=180s
 kubectl -n sai logs job/sai-db-init
 ```
-- 로그 확인: `Ssl_version` 줄에 TLS 버전(예: TLSv1.3), 마지막 줄 `완료: sai 테이블 32개` (앱 23 + Batch 9)
+- 로그 확인: `Ssl_version` 줄에 TLS 버전(예: TLSv1.3), 마지막 줄 `완료: sai 테이블 30개` (앱 21 + Batch 9)
 - 다시 실행: `kubectl -n sai delete job sai-db-init` 후 apply
 - 멈춰 있으면(ContainerCreating): ConfigMap `sai-db-schema`와 Secret `sai-db-init`이 둘 다 있는지 확인
 - 백엔드에 새 SQL 파일이 생기면 로그에 "순서 목록에 없는 파일" 경고가 나온다 → db-init.sh 의 ORDER에 추가

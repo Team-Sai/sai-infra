@@ -41,7 +41,7 @@ ORDER=(
   01_loancontract.sql 02_repayment_schedule.sql 03_contractchange.sql 04_contractaccount.sql
   recurring_settlement.sql settlement.sql payment.sql settlement_account.sql
   settlement_invitation.sql settlement_participant.sql settlement_abandonment_alert.sql
-  notification.sql preparation_proposal.sql repayment_preparation_event.sql shedlock.sql
+  notification.sql shedlock.sql
 )
 
 echo "[1/5] 접속 확인: $DB_HOST:$DB_PORT"
