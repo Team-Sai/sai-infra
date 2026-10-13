@@ -98,20 +98,20 @@ kubectl -n argocd delete secret argocd-initial-admin-secret   # 로그인 확인
 4. 백엔드 운영 설정: `sai.mock-bank.base-url` = output `mock_bank_private_api_url`, `public-base-url` = output `mock_bank_browser_url`
 
 ## 3. 배포하는 날 순서
-| 순서 | 할 일 | 확인 |
-|---|---|---|
-| 1 | `terraform apply` (Terraform 담당) → output 공유 | output 값 |
-| 2 | SSM 터널 → kubeconfig (위 1번) | `kubectl get nodes` 2대 |
-| 3 | LB Controller → Metrics Server → Argo CD → Argo CD 프로젝트 (위 2번, 모두 `--wait`) | 파드 Running |
-| 4 | 이미지 ECR push (태그 = git 커밋 해시) | ECR에 태그 |
-| 5 | DB 초기화 Job (kubernetes/README.md) → Secret 삭제 | 로그: Ssl_version, 테이블 32개 |
-| 6 | 운영 설정 Secret `sai-api-config` | `kubectl -n sai get secret` |
+| 순서 | 할 일 | 확인                                                   |
+|---|---|--------------------------------------------------------|
+| 1 | `terraform apply` (Terraform 담당) → output 공유 | output 값                                              |
+| 2 | SSM 터널 → kubeconfig (위 1번) | `kubectl get nodes` 2대                                |
+| 3 | LB Controller → Metrics Server → Argo CD → Argo CD 프로젝트 (위 2번, 모두 `--wait`) | 파드 Running                                           |
+| 4 | 이미지 ECR push (태그 = git 커밋 해시) | ECR에 태그                                             |
+| 5 | DB 초기화 Job (kubernetes/README.md) → Secret 삭제 | 로그: Ssl_version, 테이블 30개                         |
+| 6 | 운영 설정 Secret `sai-api-config` | `kubectl -n sai get secret`                            |
 | 7 | overlays/demo의 ECR 주소·태그를 채워 dev에 머지 → **dev → main PR 머지** | `kubectl kustomize kubernetes/overlays/demo` 빈칸 없음 |
-| 8 | `kubectl apply -f kubernetes/platform/argocd/apps/sai-demo.yaml` | Application Synced / Healthy, ALB 주소 생성 |
-| 9 | 회원가입·로그인·업로드·AI 분석 | 브라우저 |
-| 10 | 파드 1개 삭제·롤링 배포 중 요청 | 에러 0번 |
-| 11 | `kubectl top pods -n sai` | api 메모리 (kind 482Mi와 비교) |
-| 12 | RDS `require_secure_transport=ON` 적용 후 다시 로그인 | 정상 |
+| 8 | `kubectl apply -f kubernetes/platform/argocd/apps/sai-demo.yaml` | Application Synced / Healthy, ALB 주소 생성            |
+| 9 | 회원가입·로그인·업로드·AI 분석 | 브라우저                                               |
+| 10 | 파드 1개 삭제·롤링 배포 중 요청 | 에러 0번                                               |
+| 11 | `kubectl top pods -n sai` | api 메모리 (kind 482Mi와 비교)                         |
+| 12 | RDS `require_secure_transport=ON` 적용 후 다시 로그인 | 정상                                                   |
 
 - Argo CD가 관리하는 동안 `kubectl rollout restart`는 쓰지 않는다. (selfHeal이 되돌려 재시작이 한 번 더 일어남)
   재시작은 `kubectl -n sai delete pod -l app=sai-api`.
