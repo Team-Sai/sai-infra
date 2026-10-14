@@ -1,0 +1,20 @@
+# 노드 교체·업그레이드 같은 "계획된 작업" 때 한 번에 1개까지만 내려가게 함
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: sai-api
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: sai-api
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: sai-web
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: sai-web

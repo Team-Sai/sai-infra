@@ -1,0 +1,2 @@
+# 모든 텍스트 파일을 Git 안에서는 LF로 저장 (Windows·WSL·Mac 누가 커밋해도 같게)
+* text=auto eol=lf

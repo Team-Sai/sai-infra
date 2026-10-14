@@ -1,0 +1,94 @@
+# 브라우저 경로: CloudFront VPC Origin 보안 그룹에서만 8080에 도달합니다.
+server {
+  listen ${origin_port} default_server;
+  server_name _;
+
+  client_max_body_size 2m;
+  proxy_http_version 1.1;
+  proxy_set_header Connection "";
+  proxy_set_header Host $host;
+  proxy_set_header X-Forwarded-Host $host;
+  proxy_set_header X-Forwarded-Proto https;
+  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+
+  # Allow only the API paths used by the browser UI. Private backend callbacks
+  # and any new API route remain inaccessible through this listener by default.
+  location ~ ^/api/(?:auth/(?:signup|login)|link/confirm|mock-bank/(?:accounts|transfers))/?$ {
+    limit_except POST { deny all; }
+    proxy_pass http://127.0.0.1:${app_port};
+  }
+
+  location = /api/users/me {
+    limit_except GET DELETE { deny all; }
+    proxy_pass http://127.0.0.1:${app_port};
+  }
+
+  location ~ ^/api/(?:linked-accounts|bank-user/accounts|mock-bank/(?:accounts/my(?:/(?:transactions|[0-9]+/transactions))?|customer-accounts/lookup|transfers/[0-9]+))/?$ {
+    limit_except GET { deny all; }
+    proxy_pass http://127.0.0.1:${app_port};
+  }
+
+  # Match the API prefix case-insensitively so variants cannot fall through to the general proxy.
+  location ~* ^/api(?:/|$) { return 404; }
+
+  location / {
+    proxy_pass http://127.0.0.1:${app_port};
+  }
+}
+
+# SAI 백엔드 전용 API: VPC Peering과 App Private CIDR SG 규칙으로 제한되고 TLS를 사용합니다.
+server {
+  listen ${api_port} ssl default_server;
+  server_name ${api_hostname};
+
+  ssl_certificate     /etc/sai-mock-bank/tls/fullchain.pem;
+  ssl_certificate_key /etc/sai-mock-bank/tls/private-key.pem;
+  ssl_protocols TLSv1.2 TLSv1.3;
+  ssl_session_tickets off;
+
+  location ~ ^/api/mock-bank/link/?$ {
+    limit_except POST { deny all; }
+    proxy_pass http://127.0.0.1:${app_port};
+    proxy_http_version 1.1;
+    proxy_set_header Connection "";
+    proxy_set_header Host ${api_hostname};
+    proxy_set_header X-Forwarded-Host ${api_hostname};
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+  }
+
+  location ~ ^/api/link/(confirm-key|revoke-key|recover-key)/?$ {
+    limit_except POST { deny all; }
+    proxy_pass http://127.0.0.1:${app_port};
+    proxy_http_version 1.1;
+    proxy_set_header Connection "";
+    proxy_set_header Host ${api_hostname};
+    proxy_set_header X-Forwarded-Host ${api_hostname};
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+  }
+
+  location = /api/mock-bank/accounts {
+    limit_except GET { deny all; }
+    proxy_pass http://127.0.0.1:${app_port};
+    proxy_http_version 1.1;
+    proxy_set_header Connection "";
+    proxy_set_header Host ${api_hostname};
+    proxy_set_header X-Forwarded-Host ${api_hostname};
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+  }
+
+  location ~ ^/api/mock-bank/accounts/[0-9]+(/transactions)?/?$ {
+    limit_except GET { deny all; }
+    proxy_pass http://127.0.0.1:${app_port};
+    proxy_http_version 1.1;
+    proxy_set_header Connection "";
+    proxy_set_header Host ${api_hostname};
+    proxy_set_header X-Forwarded-Host ${api_hostname};
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+  }
+
+  location / { return 404; }
+}

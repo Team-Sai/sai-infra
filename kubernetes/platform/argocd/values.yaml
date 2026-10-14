@@ -1,0 +1,30 @@
+# Argo CD: Git(sai-infra)의 매니페스트를 클러스터에 자동 반영
+# 접속은 kubectl port-forward 로만 한다 (인터넷에 열지 않음)
+dex:
+  enabled: false            # 외부 로그인(SSO) 안 씀 → 파드 1개 절약
+notifications:
+  enabled: false            # 알림 안 씀
+
+# 노드가 작아서(t3.medium) 요청량을 작게
+controller:
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits:   { memory: 512Mi }
+repoServer:
+  resources:
+    requests: { cpu: 50m, memory: 128Mi }
+    limits:   { memory: 256Mi }
+server:
+  service:
+    type: ClusterIP       # LoadBalancer로 열지 않음
+  resources:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits:   { memory: 128Mi }
+redis:
+  resources:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits:   { memory: 128Mi }
+applicationSet:
+  resources:
+    requests: { cpu: 25m, memory: 64Mi }
+    limits:   { memory: 128Mi }

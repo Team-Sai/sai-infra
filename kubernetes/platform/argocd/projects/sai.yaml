@@ -1,0 +1,20 @@
+# Argo CD 프로젝트: 사이원장 앱이 할 수 있는 범위를 제한한다
+# - 가져올 수 있는 Git: sai-infra 레포만
+# - 배포할 수 있는 곳: 이 클러스터의 sai 네임스페이스만
+# - 클러스터 전체 리소스: Namespace만 (overlays/demo가 sai 네임스페이스를 만듦)
+# default 프로젝트는 모든 레포·네임스페이스·클러스터 리소스를 허용하므로 쓰지 않는다
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: sai
+  namespace: argocd
+spec:
+  description: 사이원장 앱 (sai-infra → sai 네임스페이스)
+  sourceRepos:
+    - https://github.com/Team-Sai/sai-infra.git
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: sai
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
