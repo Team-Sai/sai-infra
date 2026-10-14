@@ -123,14 +123,17 @@ resource "aws_nat_gateway" "mock_bank" {
 resource "aws_route_table" "private" {
   vpc_id = aws_vpc.mock_bank.id
 
-  route {
-    cidr_block     = "0.0.0.0/0"
-    nat_gateway_id = aws_nat_gateway.mock_bank.id
-  }
-
   tags = {
     Name = "${var.name_prefix}-mock-bank-private-rt"
   }
+}
+
+# Manage private default and VPC peering routes with aws_route resources so
+# Terraform does not remove the separately managed peering route.
+resource "aws_route" "private_default" {
+  route_table_id         = aws_route_table.private.id
+  destination_cidr_block = "0.0.0.0/0"
+  nat_gateway_id         = aws_nat_gateway.mock_bank.id
 }
 
 resource "aws_route_table_association" "private" {

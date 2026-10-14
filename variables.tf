@@ -322,6 +322,7 @@ variable "github_actions_ecr_subjects" {
     "sai-backend"   = "repo:Team-Sai@307796299/sai-backend-v2@1360767689:ref:refs/heads/main"
     "sai-frontend"  = "repo:Team-Sai@307796299/sai-frontend@1367028447:ref:refs/heads/main"
     "sai-mock-bank" = "repo:Team-Sai@307796299/sai-mock-bank@1312119875:ref:refs/heads/main"
+    "sai-ai"        = "repo:Team-Sai@307796299/sai-ai@1414553261:ref:refs/heads/main"
   }
 
   validation {

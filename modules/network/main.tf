@@ -108,14 +108,19 @@ resource "aws_route_table" "app" {
 
   vpc_id = aws_vpc.main.id
 
-  route {
-    cidr_block     = "0.0.0.0/0"
-    nat_gateway_id = aws_nat_gateway.az[count.index].id
-  }
-
   tags = {
     Name = "${var.name_prefix}-app-private-rt-${count.index + 1}"
   }
+}
+
+# Keep route ownership in standalone aws_route resources. Mock Bank adds VPC
+# peering routes to these tables when enabled, so inline routes would conflict.
+resource "aws_route" "app_default" {
+  count = length(var.availability_zones)
+
+  route_table_id         = aws_route_table.app[count.index].id
+  destination_cidr_block = "0.0.0.0/0"
+  nat_gateway_id         = aws_nat_gateway.az[count.index].id
 }
 
 resource "aws_route_table_association" "app" {
