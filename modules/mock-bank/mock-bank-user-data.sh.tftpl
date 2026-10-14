@@ -2,7 +2,8 @@
 set -euo pipefail
 umask 077
 
-dnf install -y docker nginx curl python3 awscli-2 xfsprogs
+# Amazon Linux 2023 ships curl-minimal; install it explicitly instead of the conflicting full curl package.
+dnf install -y docker nginx curl-minimal python3 awscli-2 xfsprogs
 systemctl enable --now docker
 
 install -d -m 0700 /opt/sai-mock-bank
@@ -36,7 +37,9 @@ if ! grep -q "UUID=$DATABASE_FILESYSTEM_UUID[[:space:]]" /etc/fstab; then
   printf 'UUID=%s /mnt/mock-bank-database xfs defaults,nofail 0 2\n' \
     "$DATABASE_FILESYSTEM_UUID" >> /etc/fstab
 fi
-mount /mnt/mock-bank-database
+if ! mountpoint -q /mnt/mock-bank-database; then
+  mount /mnt/mock-bank-database
+fi
 chown 999:999 /mnt/mock-bank-database
 chmod 0750 /mnt/mock-bank-database
 
