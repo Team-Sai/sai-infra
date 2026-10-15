@@ -47,6 +47,7 @@ module "storage" {
     "sai-backend",
     "sai-frontend",
     "sai-mock-bank",
+    "sai-ai",
   ]
 }
 
