@@ -180,7 +180,7 @@ resource "aws_launch_template" "nodes" {
     device_name = "/dev/xvda"
     ebs {
       encrypted             = true
-      volume_size           = 20
+      volume_size           = 40
       volume_type           = "gp3"
       delete_on_termination = true
     }
