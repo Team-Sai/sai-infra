@@ -81,9 +81,9 @@ variable "eks_cluster_version" {
 }
 
 variable "eks_node_instance_types" {
-  description = "초기 EKS 노드의 EC2 타입입니다. 작은 개발용 기본값이며 용량을 보장하지 않습니다."
+  description = "초기 EKS 노드의 EC2 타입입니다. sai-ai 메모리 요청 5GiB 수용을 위한 기본값입니다."
   type        = list(string)
-  default     = ["t3.medium"]
+  default     = ["t3.large"]
 }
 
 variable "rds_instance_class" {
