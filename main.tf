@@ -109,6 +109,4 @@ module "iam" {
     module.storage.ecr_repository_arns["sai-backend"],
     module.storage.ecr_repository_arns["sai-frontend"],
   ]
-
-  depends_on = [module.eks]
 }
