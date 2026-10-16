@@ -1,7 +1,11 @@
 # CloudFront는 서울 Mock Bank VPC 안의 private EC2를 원본으로 사용합니다.
+resource "terraform_data" "mock_bank_vpc_origin_instance" {
+  triggers_replace = [aws_instance.mock_bank.id]
+}
+
 resource "aws_cloudfront_vpc_origin" "mock_bank" {
   vpc_origin_endpoint_config {
-    name                   = "${var.name_prefix}-mock-bank-origin"
+    name                   = "${var.name_prefix}-mock-bank-origin-${substr(aws_instance.mock_bank.id, 2, 8)}"
     arn                    = aws_instance.mock_bank.arn
     http_port              = var.mock_bank_origin_port
     https_port             = var.mock_bank_api_port
@@ -16,6 +20,11 @@ resource "aws_cloudfront_vpc_origin" "mock_bank" {
 
   tags = {
     Name = "${var.name_prefix}-mock-bank-origin"
+  }
+
+  lifecycle {
+    create_before_destroy = true
+    replace_triggered_by  = [terraform_data.mock_bank_vpc_origin_instance]
   }
 }
 
