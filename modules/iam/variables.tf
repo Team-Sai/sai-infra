@@ -47,3 +47,21 @@ variable "redis_replication_group_arn" {
   description = "앱이 연결할 ElastiCache replication group ARN입니다."
   type        = string
 }
+
+
+variable "image_updater_namespace" {
+  description = "Argo CD Image Updater가 설치된 네임스페이스입니다."
+  type        = string
+  default     = "argocd"
+}
+
+variable "image_updater_service_account" {
+  description = "Argo CD Image Updater ServiceAccount 이름입니다."
+  type        = string
+  default     = "argocd-image-updater"
+}
+
+variable "image_updater_ecr_repository_arns" {
+  description = "Image Updater가 새 태그를 조회할 ECR 저장소 ARN 목록입니다."
+  type        = list(string)
+}
