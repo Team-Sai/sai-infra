@@ -57,10 +57,6 @@ resource "aws_iam_policy" "application" {
         Effect   = "Allow"
         Action   = ["elasticache:Connect"]
         Resource = [var.redis_replication_group_arn, var.redis_user_arn]
-          image_updater_ecr_repository_arns = [
-            module.storage.ecr_repository_arns["sai-backend"],
-            module.storage.ecr_repository_arns["sai-frontend"],
-          ]
       },
     ]
   })
