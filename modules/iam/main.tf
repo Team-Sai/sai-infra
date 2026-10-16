@@ -57,6 +57,10 @@ resource "aws_iam_policy" "application" {
         Effect   = "Allow"
         Action   = ["elasticache:Connect"]
         Resource = [var.redis_replication_group_arn, var.redis_user_arn]
+          image_updater_ecr_repository_arns = [
+            module.storage.ecr_repository_arns["sai-backend"],
+            module.storage.ecr_repository_arns["sai-frontend"],
+          ]
       },
     ]
   })
@@ -118,4 +122,65 @@ resource "aws_eks_pod_identity_association" "load_balancer_controller" {
   namespace       = var.load_balancer_controller_namespace
   service_account = var.load_balancer_controller_service_account
   role_arn        = aws_iam_role.load_balancer_controller.arn
+}
+
+
+# Argo CD Image Updater: ECR 새 태그 조회 전용 (읽기만)
+resource "aws_iam_role" "image_updater" {
+  name = "${var.name_prefix}-argocd-image-updater"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Service = "pods.eks.amazonaws.com" }
+      Action    = ["sts:AssumeRole", "sts:TagSession"]
+      Condition = {
+        StringEquals = {
+          "aws:RequestTag/eks-cluster-arn"            = var.eks_cluster_arn
+          "aws:RequestTag/kubernetes-namespace"       = var.image_updater_namespace
+          "aws:RequestTag/kubernetes-service-account" = var.image_updater_service_account
+        }
+      }
+    }]
+  })
+
+  tags = {
+    Name = "${var.name_prefix}-argocd-image-updater"
+  }
+}
+
+resource "aws_iam_role_policy" "image_updater_ecr_read" {
+  name = "ecr-read"
+  role = aws_iam_role.image_updater.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["ecr:GetAuthorizationToken"]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "ecr:DescribeRepositories",
+          "ecr:DescribeImages",
+          "ecr:ListImages",
+          "ecr:BatchGetImage",
+          "ecr:GetDownloadUrlForLayer",
+          "ecr:BatchCheckLayerAvailability",
+        ]
+        Resource = var.image_updater_ecr_repository_arns
+      },
+    ]
+  })
+}
+
+resource "aws_eks_pod_identity_association" "image_updater" {
+  cluster_name    = var.eks_cluster_name
+  namespace       = var.image_updater_namespace
+  service_account = var.image_updater_service_account
+  role_arn        = aws_iam_role.image_updater.arn
 }
