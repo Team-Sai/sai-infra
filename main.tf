@@ -105,6 +105,10 @@ module "iam" {
   backup_bucket_arn                        = module.storage.backup_bucket_arn
   redis_user_arn                           = module.data.redis_user_arn
   redis_replication_group_arn              = module.data.redis_replication_group_arn
+  image_updater_ecr_repository_arns = [
+    module.storage.ecr_repository_arns["sai-backend"],
+    module.storage.ecr_repository_arns["sai-frontend"],
+  ]
 
   depends_on = [module.eks]
 }
