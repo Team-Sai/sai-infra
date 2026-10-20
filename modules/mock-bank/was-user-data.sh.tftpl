@@ -1,0 +1,88 @@
+#!/bin/bash
+set -euo pipefail
+umask 077
+
+dnf install -y docker nginx curl-minimal python3 awscli-2
+systemctl enable --now docker
+install -d -m 0700 /opt/sai-mock-bank /etc/sai-mock-bank/tls
+install -d -m 0755 /usr/local/lib/docker/cli-plugins
+curl --fail --silent --show-error --location \
+  "https://github.com/docker/compose/releases/download/${docker_compose_version}/docker-compose-linux-x86_64" \
+  --output /usr/local/lib/docker/cli-plugins/docker-compose
+echo "${docker_compose_sha256}  /usr/local/lib/docker/cli-plugins/docker-compose" | sha256sum --check --status
+chmod 0755 /usr/local/lib/docker/cli-plugins/docker-compose
+
+AWS_REGION="${aws_region}"
+APP_SECRET_ARN="${mock_bank_secret_arn}"
+TLS_SECRET_ARN="${mock_bank_api_certificate_secret_arn}"
+IMAGE_URI="${mock_bank_image}"
+ECR_REGISTRY="$${IMAGE_URI%%/*}"
+aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
+trap 'docker logout "$ECR_REGISTRY" >/dev/null 2>&1 || true' EXIT
+APP_SECRET_JSON="$(aws secretsmanager get-secret-value --region "$AWS_REGION" --secret-id "$APP_SECRET_ARN" --query SecretString --output text)"
+TLS_SECRET_JSON="$(aws secretsmanager get-secret-value --region "$AWS_REGION" --secret-id "$TLS_SECRET_ARN" --query SecretString --output text)"
+export APP_SECRET_JSON TLS_SECRET_JSON
+python3 - <<'PY'
+import json, os, re
+from pathlib import Path
+required = {"DB_NAME", "DB_USERNAME", "DB_PASSWORD", "DB_ROOT_PASSWORD", "MOCK_BANK_KEY_HASH_SECRET", "JWT_SECRET", "LINK_IDENTITY_HASH_SECRET", "LINK_STATE_SECRET", "LINK_CALLBACK_API_KEY", "PORTONE_IDENTITY_STORE_ID", "PORTONE_IDENTITY_CHANNEL_KEY", "PORTONE_IDENTITY_API_SECRET", "SAI_BACKEND_BASE_URL", "SAI_BACKEND_CALLBACK_URL"}
+settings = json.loads(os.environ["APP_SECRET_JSON"])
+if required.difference(settings): raise SystemExit("Required Mock Bank application settings are missing from Secrets Manager.")
+with Path("/opt/sai-mock-bank/.env").open("w", encoding="utf-8") as env_file:
+    for key, value in settings.items():
+        if not re.fullmatch(r"[A-Z0-9_]+", key): raise SystemExit("Invalid environment variable name in Mock Bank secret.")
+        value = str(value).replace("\\", "\\\\").replace("'", "\\'").replace("\r", "\\r").replace("\n", "\\n")
+        env_file.write(f"{key}='{value}'\n")
+tls = json.loads(os.environ["TLS_SECRET_JSON"])
+if not tls.get("TLS_CERTIFICATE_PEM", "").startswith("-----BEGIN CERTIFICATE-----"): raise SystemExit("TLS certificate secret must contain a PEM certificate chain.")
+if "-----BEGIN " not in tls.get("TLS_PRIVATE_KEY_PEM", "") or "PRIVATE KEY-----" not in tls["TLS_PRIVATE_KEY_PEM"]: raise SystemExit("TLS certificate secret must contain a PEM private key.")
+cert = Path("/etc/sai-mock-bank/tls/fullchain.pem")
+key = Path("/etc/sai-mock-bank/tls/private-key.pem")
+cert.write_text(tls["TLS_CERTIFICATE_PEM"], encoding="utf-8")
+key.write_text(tls["TLS_PRIVATE_KEY_PEM"], encoding="utf-8")
+cert.chmod(0o600); key.chmod(0o600)
+PY
+unset APP_SECRET_JSON TLS_SECRET_JSON
+chmod 0600 /opt/sai-mock-bank/.env
+printf 'MOCK_BANK_APP_PORT=%s\n' "${mock_bank_app_port}" >> /opt/sai-mock-bank/.env
+cat > /opt/sai-mock-bank/compose.yaml <<'COMPOSE'
+services:
+  mock-bank-app:
+    image: "${mock_bank_image}"
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SERVER_PORT: $${MOCK_BANK_APP_PORT}
+      SERVER_FORWARD_HEADERS_STRATEGY: framework
+      SERVER_SERVLET_SESSION_COOKIE_SECURE: "true"
+      SERVER_SERVLET_SESSION_COOKIE_HTTP_ONLY: "true"
+      SPRING_DATASOURCE_URL: "jdbc:mariadb://${database_private_ip}:3306/$${DB_NAME}"
+      SPRING_DATASOURCE_USERNAME: $${DB_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: $${DB_PASSWORD}
+      MOCK_BANK_KEY_HASH_SECRET: $${MOCK_BANK_KEY_HASH_SECRET}
+      JWT_SECRET: $${JWT_SECRET}
+      LINK_IDENTITY_HASH_SECRET: $${LINK_IDENTITY_HASH_SECRET}
+      LINK_STATE_SECRET: $${LINK_STATE_SECRET}
+      LINK_STATE_ALLOWED_RETURN_URLS: $${SAI_BACKEND_CALLBACK_URL}
+      LINK_CALLBACK_API_KEY: $${LINK_CALLBACK_API_KEY}
+      PORTONE_IDENTITY_STORE_ID: $${PORTONE_IDENTITY_STORE_ID}
+      PORTONE_IDENTITY_CHANNEL_KEY: $${PORTONE_IDENTITY_CHANNEL_KEY}
+      PORTONE_IDENTITY_API_SECRET: $${PORTONE_IDENTITY_API_SECRET}
+      SAI_BACKEND_BASE_URL: $${SAI_BACKEND_BASE_URL}
+    ports:
+      - "${was_private_ip}:$${MOCK_BANK_APP_PORT}:$${MOCK_BANK_APP_PORT}"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+COMPOSE
+cat > /etc/nginx/conf.d/sai-mock-bank.conf <<'NGINX'
+${nginx_config}
+NGINX
+rm -f /etc/nginx/conf.d/default.conf
+nginx -t
+systemctl enable --now nginx
+cd /opt/sai-mock-bank
+docker compose pull
+docker compose up --detach

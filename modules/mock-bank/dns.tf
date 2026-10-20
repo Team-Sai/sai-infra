@@ -18,7 +18,7 @@ resource "aws_route53_record" "api_private" {
   name    = var.mock_bank_api_hostname
   type    = "A"
   ttl     = 60
-  records = [aws_instance.mock_bank.private_ip]
+  records = [aws_instance.was.private_ip]
 }
 
 # 사용자 지정 브라우저 도메인은 선택 사항입니다. 미지정 시 CloudFront 기본 HTTPS 도메인을 사용합니다.

@@ -1,12 +1,12 @@
 # CloudFront는 서울 Mock Bank VPC 안의 private EC2를 원본으로 사용합니다.
 resource "terraform_data" "mock_bank_vpc_origin_instance" {
-  triggers_replace = [aws_instance.mock_bank.id]
+  triggers_replace = [aws_instance.web.id]
 }
 
 resource "aws_cloudfront_vpc_origin" "mock_bank" {
   vpc_origin_endpoint_config {
-    name                   = "${var.name_prefix}-mock-bank-origin-${substr(aws_instance.mock_bank.id, 2, 8)}"
-    arn                    = aws_instance.mock_bank.arn
+    name                   = "${var.name_prefix}-mock-bank-origin-${substr(aws_instance.web.id, 2, 8)}"
+    arn                    = aws_instance.web.arn
     http_port              = var.mock_bank_origin_port
     https_port             = var.mock_bank_api_port
     origin_protocol_policy = "http-only"
@@ -44,7 +44,7 @@ data "aws_security_group" "cloudfront_vpc_origin" {
 }
 
 resource "aws_vpc_security_group_ingress_rule" "cloudfront_origin" {
-  security_group_id            = aws_security_group.mock_bank.id
+  security_group_id            = aws_security_group.web.id
   referenced_security_group_id = data.aws_security_group.cloudfront_vpc_origin.id
   description                  = "CloudFront VPC Origin access to browser listener"
   ip_protocol                  = "tcp"
@@ -123,7 +123,7 @@ resource "aws_cloudfront_distribution" "mock_bank" {
   aliases         = var.viewer_domain_name == null ? [] : [var.viewer_domain_name]
 
   origin {
-    domain_name = aws_instance.mock_bank.private_dns
+    domain_name = aws_instance.web.private_dns
     origin_id   = "${var.name_prefix}-mock-bank-vpc-origin"
 
     vpc_origin_config {
