@@ -8,6 +8,16 @@ variable "vpc_id" {
   type        = string
 }
 
+variable "availability_zones" {
+  description = "Read replica를 하나씩 배치할 서로 다른 AZ 목록입니다."
+  type        = list(string)
+
+  validation {
+    condition     = length(var.availability_zones) == 2 && length(distinct(var.availability_zones)) == 2
+    error_message = "MariaDB read replica 두 개를 서로 다른 AZ에 배치하려면 AZ를 두 개 지정해야 합니다."
+  }
+}
+
 variable "data_private_subnet_ids" {
   description = "두 AZ의 Data Private 서브넷입니다."
   type        = list(string)

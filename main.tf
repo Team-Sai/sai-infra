@@ -28,6 +28,7 @@ module "data" {
 
   name_prefix                   = local.name_prefix
   vpc_id                        = module.network.vpc_id
+  availability_zones            = var.availability_zones
   data_private_subnet_ids       = module.network.data_private_subnet_ids
   node_security_group_id        = module.eks.node_security_group_id
   rds_instance_class            = var.rds_instance_class
