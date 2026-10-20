@@ -20,7 +20,7 @@ variable "mock_vpc_cidr" {
 }
 
 variable "mock_availability_zone" {
-  description = "단일 Mock Bank EC2와 EBS를 배치할 AZ입니다. 한 AZ 구성은 고가용성이 아닙니다."
+  description = "Mock Bank 3개 티어 EC2와 DB EBS를 배치할 AZ입니다. 단일 AZ 구성은 AZ 장애에 대응하지 않습니다."
   type        = string
   default     = "ap-northeast-2a"
 }
@@ -97,19 +97,19 @@ variable "mock_bank_api_port" {
 }
 
 variable "mock_bank_origin_port" {
-  description = "CloudFront VPC Origin이 Mock Bank 사설 EC2 Nginx에 연결하는 HTTP 포트입니다."
+  description = "CloudFront VPC Origin이 Mock Bank Web tier Nginx에 연결하는 HTTP 포트입니다."
   type        = number
   default     = 8080
 }
 
 variable "mock_bank_app_port" {
-  description = "Compose 앱의 loopback 전용 포트입니다. 인터넷/CloudFront에서 직접 연결하지 않습니다."
+  description = "WAS Spring 앱 포트입니다. Web tier와 WAS 내부 Nginx에서만 허용합니다."
   type        = number
   default     = 8081
 }
 
 variable "instance_type" {
-  description = "비용이 드는 Mock Bank 단일 EC2 크기입니다. 작은 데모용 기본값이며 성능을 보장하지 않습니다."
+  description = "Mock Bank Web, WAS, Database EC2에 공통 적용할 사양입니다. 작은 데모용 기본값이며 성능을 보장하지 않습니다."
   type        = string
   default     = "t3.small"
 }

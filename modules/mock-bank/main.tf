@@ -1,8 +1,14 @@
 locals {
-  public_subnet_cidr  = cidrsubnet(var.mock_vpc_cidr, 8, 1)
-  private_subnet_cidr = cidrsubnet(var.mock_vpc_cidr, 8, 2)
-  database_private_ip = cidrhost(local.private_subnet_cidr, 10)
-  data_volume_tag     = "${var.name_prefix}-mock-bank-database"
+  public_subnet_cidr = cidrsubnet(var.mock_vpc_cidr, 8, 1)
+  # Keep the former single-tier subnet (index 2) free during replacement so
+  # Terraform can create the new tier subnets before deleting the old subnet.
+  web_subnet_cidr      = cidrsubnet(var.mock_vpc_cidr, 8, 3)
+  was_subnet_cidr      = cidrsubnet(var.mock_vpc_cidr, 8, 4)
+  database_subnet_cidr = cidrsubnet(var.mock_vpc_cidr, 8, 5)
+  web_private_ip       = cidrhost(local.web_subnet_cidr, 10)
+  was_private_ip       = cidrhost(local.was_subnet_cidr, 10)
+  database_private_ip  = cidrhost(local.database_subnet_cidr, 10)
+  data_volume_tag      = "${var.name_prefix}-mock-bank-database"
 
   # Terraform has no cidrcontains function. Convert both IPv4 CIDR boundaries to integers for overlap checks.
   mock_vpc_start_octets = [for octet in split(".", cidrhost(var.mock_vpc_cidr, 0)) : tonumber(octet)]
@@ -72,14 +78,39 @@ resource "aws_subnet" "public" {
   }
 }
 
-resource "aws_subnet" "private" {
+resource "aws_subnet" "web" {
   vpc_id                  = aws_vpc.mock_bank.id
   availability_zone       = var.mock_availability_zone
-  cidr_block              = local.private_subnet_cidr
+  cidr_block              = local.web_subnet_cidr
   map_public_ip_on_launch = false
 
   tags = {
-    Name = "${var.name_prefix}-mock-bank-private"
+    Name = "${var.name_prefix}-mock-bank-web-private"
+    Tier = "web"
+  }
+}
+
+resource "aws_subnet" "was" {
+  vpc_id                  = aws_vpc.mock_bank.id
+  availability_zone       = var.mock_availability_zone
+  cidr_block              = local.was_subnet_cidr
+  map_public_ip_on_launch = false
+
+  tags = {
+    Name = "${var.name_prefix}-mock-bank-was-private"
+    Tier = "was"
+  }
+}
+
+resource "aws_subnet" "database" {
+  vpc_id                  = aws_vpc.mock_bank.id
+  availability_zone       = var.mock_availability_zone
+  cidr_block              = local.database_subnet_cidr
+  map_public_ip_on_launch = false
+
+  tags = {
+    Name = "${var.name_prefix}-mock-bank-database-private"
+    Tier = "database"
   }
 }
 
@@ -137,7 +168,13 @@ resource "aws_route" "private_default" {
 }
 
 resource "aws_route_table_association" "private" {
-  subnet_id      = aws_subnet.private.id
+  for_each = {
+    web      = aws_subnet.web.id
+    was      = aws_subnet.was.id
+    database = aws_subnet.database.id
+  }
+
+  subnet_id      = each.value
   route_table_id = aws_route_table.private.id
 }
 
@@ -166,9 +203,9 @@ resource "aws_route" "mock_bank_to_main" {
   vpc_peering_connection_id = aws_vpc_peering_connection.main.id
 }
 
-resource "aws_security_group" "mock_bank" {
-  name        = "${var.name_prefix}-mock-bank"
-  description = "CloudFront VPC Origin web traffic and SAI App Private TLS API only; no SSH."
+resource "aws_security_group" "web" {
+  name        = "${var.name_prefix}-mock-bank-web"
+  description = "CloudFront VPC Origin access to Mock Bank web tier; no SSH."
   vpc_id      = aws_vpc.mock_bank.id
 
   egress {
@@ -180,14 +217,53 @@ resource "aws_security_group" "mock_bank" {
   }
 
   tags = {
-    Name = "${var.name_prefix}-mock-bank"
+    Name = "${var.name_prefix}-mock-bank-web"
+    Tier = "web"
+  }
+}
+
+resource "aws_security_group" "was" {
+  name        = "${var.name_prefix}-mock-bank-was"
+  description = "Mock Bank application and SAI private API access; no SSH."
+  vpc_id      = aws_vpc.mock_bank.id
+
+  egress {
+    description = "AWS APIs, ECR, and application dependencies through the private subnet NAT route"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "${var.name_prefix}-mock-bank-was"
+    Tier = "was"
+  }
+}
+
+resource "aws_security_group" "database" {
+  name        = "${var.name_prefix}-mock-bank-database"
+  description = "Mock Bank MariaDB accepts connections only from the WAS tier; no SSH."
+  vpc_id      = aws_vpc.mock_bank.id
+
+  egress {
+    description = "AWS APIs and package downloads through the private subnet NAT route"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "${var.name_prefix}-mock-bank-database"
+    Tier = "database"
   }
 }
 
 resource "aws_vpc_security_group_ingress_rule" "app_subnets_api" {
   for_each = toset(var.main_app_subnet_cidrs)
 
-  security_group_id = aws_security_group.mock_bank.id
+  security_group_id = aws_security_group.was.id
   cidr_ipv4         = each.value
   description       = "SAI App Private subnet to Mock Bank TLS API"
   ip_protocol       = "tcp"
@@ -195,4 +271,21 @@ resource "aws_vpc_security_group_ingress_rule" "app_subnets_api" {
   to_port           = var.mock_bank_api_port
 }
 
-# TCP 8080은 CloudFront VPC Origin 보안 그룹 규칙을 만든 뒤 edge.tf에서만 허용합니다.
+# CloudFront listener는 edge.tf에서 CloudFront 관리형 SG만 Web SG에 허용합니다.
+resource "aws_vpc_security_group_ingress_rule" "web_to_was" {
+  security_group_id            = aws_security_group.was.id
+  referenced_security_group_id = aws_security_group.web.id
+  description                  = "Web Nginx to Spring application"
+  ip_protocol                  = "tcp"
+  from_port                    = var.mock_bank_app_port
+  to_port                      = var.mock_bank_app_port
+}
+
+resource "aws_vpc_security_group_ingress_rule" "was_to_database" {
+  security_group_id            = aws_security_group.database.id
+  referenced_security_group_id = aws_security_group.was.id
+  description                  = "Spring application to MariaDB"
+  ip_protocol                  = "tcp"
+  from_port                    = 3306
+  to_port                      = 3306
+}

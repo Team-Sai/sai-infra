@@ -166,18 +166,33 @@ output "mock_bank_vpc_id" {
 }
 
 output "mock_bank_private_subnet_ids" {
-  description = "Mock Bank EC2가 배치되는 사설 서브넷 ID 목록입니다. 비활성화 시 빈 목록입니다."
+  description = "Mock Bank Web, WAS, Database tier의 사설 서브넷 ID입니다. 비활성화 시 빈 목록입니다."
   value       = var.enable_mock_bank ? module.mock_bank[0].private_subnet_ids : []
 }
 
 output "mock_bank_instance_id" {
-  description = "Mock Bank 단일 EC2 instance ID입니다. 비활성화 시 null입니다."
+  description = "기존 출력 호환용 Mock Bank WAS EC2 instance ID입니다. 비활성화 시 null입니다."
   value       = var.enable_mock_bank ? module.mock_bank[0].instance_id : null
 }
 
 output "mock_bank_private_ip" {
-  description = "VPC Peering 내부 API DNS가 가리키는 고정 사설 IP입니다. 비활성화 시 null입니다."
+  description = "VPC Peering 내부 API DNS가 가리키는 WAS 사설 IP입니다. 비활성화 시 null입니다."
   value       = var.enable_mock_bank ? module.mock_bank[0].private_ip : null
+}
+
+output "mock_bank_web_instance_id" {
+  description = "CloudFront VPC Origin의 브라우저 요청을 받는 Mock Bank Web EC2 instance ID입니다."
+  value       = var.enable_mock_bank ? module.mock_bank[0].web_instance_id : null
+}
+
+output "mock_bank_was_instance_id" {
+  description = "Spring 애플리케이션을 실행하는 Mock Bank WAS EC2 instance ID입니다."
+  value       = var.enable_mock_bank ? module.mock_bank[0].was_instance_id : null
+}
+
+output "mock_bank_database_instance_id" {
+  description = "MariaDB를 실행하는 Mock Bank Database EC2 instance ID입니다."
+  value       = var.enable_mock_bank ? module.mock_bank[0].database_instance_id : null
 }
 
 output "github_actions_ecr_push_role_arns" {
