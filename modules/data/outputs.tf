@@ -3,6 +3,13 @@ output "rds_endpoint" {
   value       = aws_db_instance.mariadb.address
 }
 
+output "rds_read_replica_endpoints" {
+  description = "AZ별 MariaDB read replica endpoint map입니다."
+  value = {
+    for replica in aws_db_instance.mariadb_read_replica : replica.availability_zone => replica.address
+  }
+}
+
 output "rds_port" {
   description = "MariaDB 접속 포트입니다."
   value       = aws_db_instance.mariadb.port
