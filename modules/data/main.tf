@@ -108,6 +108,29 @@ resource "aws_db_instance" "mariadb" {
   }
 }
 
+# 읽기 복제본은 쓰기 인스턴스의 비동기 복제본입니다. 두 AZ에 하나씩 두어
+# 읽기 용량과 AZ 분산을 제공하지만, 앱의 읽기를 자동으로 이쪽으로 보내지는 않습니다.
+resource "aws_db_instance" "mariadb_read_replica" {
+  count = length(var.availability_zones)
+
+  identifier                 = "${var.name_prefix}-mariadb-read-${count.index + 1}"
+  replicate_source_db        = aws_db_instance.mariadb.arn
+  instance_class             = var.rds_instance_class
+  availability_zone          = var.availability_zones[count.index]
+  db_subnet_group_name       = aws_db_subnet_group.main.name
+  vpc_security_group_ids     = [aws_security_group.rds.id]
+  publicly_accessible        = false
+  deletion_protection        = var.rds_deletion_protection
+  skip_final_snapshot        = false
+  final_snapshot_identifier  = "${var.rds_final_snapshot_identifier}-read-${count.index + 1}"
+  auto_minor_version_upgrade = true
+
+  tags = {
+    Name = "${var.name_prefix}-mariadb-read-${count.index + 1}"
+    Role = "read-replica"
+  }
+}
+
 resource "aws_secretsmanager_secret" "application_db" {
   name                    = "${var.name_prefix}/database/application"
   description             = "App-only MariaDB username and password. DBA must add a secret version after creating a least-privilege DB user."

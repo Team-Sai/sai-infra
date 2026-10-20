@@ -78,6 +78,11 @@ output "rds_endpoint" {
   value       = module.data.rds_endpoint
 }
 
+output "rds_read_replica_endpoints" {
+  description = "AZ별 MariaDB read replica endpoint map입니다. 앱의 읽기 라우팅은 별도 변경이 필요합니다."
+  value       = module.data.rds_read_replica_endpoints
+}
+
 output "rds_port" {
   description = "RDS MariaDB 포트입니다."
   value       = module.data.rds_port
