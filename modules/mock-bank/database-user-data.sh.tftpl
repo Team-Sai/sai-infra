@@ -1,0 +1,74 @@
+#!/bin/bash
+set -euo pipefail
+umask 077
+
+dnf install -y docker curl-minimal python3 awscli-2 xfsprogs
+systemctl enable --now docker
+install -d -m 0700 /opt/sai-mock-bank
+install -d -m 0755 /usr/local/lib/docker/cli-plugins
+curl --fail --silent --show-error --location \
+  "https://github.com/docker/compose/releases/download/${docker_compose_version}/docker-compose-linux-x86_64" \
+  --output /usr/local/lib/docker/cli-plugins/docker-compose
+echo "${docker_compose_sha256}  /usr/local/lib/docker/cli-plugins/docker-compose" | sha256sum --check --status
+chmod 0755 /usr/local/lib/docker/cli-plugins/docker-compose
+
+# Reuse the existing encrypted EBS filesystem. Only format a blank volume.
+DATABASE_VOLUME_ID="${database_volume_id}"
+DATABASE_DEVICE_ID="/dev/disk/by-id/nvme-Amazon_Elastic_Block_Store_$${DATABASE_VOLUME_ID//-/}"
+for attempt in $(seq 1 120); do
+  if [ -b "$DATABASE_DEVICE_ID" ]; then break; fi
+  sleep 5
+done
+if [ ! -b "$DATABASE_DEVICE_ID" ]; then echo "Mock Bank database EBS device did not appear." >&2; exit 1; fi
+if ! blkid "$DATABASE_DEVICE_ID" >/dev/null 2>&1; then mkfs.xfs "$DATABASE_DEVICE_ID"; fi
+DATABASE_FILESYSTEM_UUID="$(blkid -s UUID -o value "$DATABASE_DEVICE_ID")"
+install -d -m 0750 /mnt/mock-bank-database
+if ! grep -q "UUID=$DATABASE_FILESYSTEM_UUID[[:space:]]" /etc/fstab; then
+  printf 'UUID=%s /mnt/mock-bank-database xfs defaults,nofail 0 2\n' "$DATABASE_FILESYSTEM_UUID" >> /etc/fstab
+fi
+if ! mountpoint -q /mnt/mock-bank-database; then mount /mnt/mock-bank-database; fi
+chown 999:999 /mnt/mock-bank-database
+chmod 0750 /mnt/mock-bank-database
+
+APP_SECRET_JSON="$(aws secretsmanager get-secret-value --region "${aws_region}" --secret-id "${mock_bank_secret_arn}" --query SecretString --output text)"
+export APP_SECRET_JSON
+python3 - <<'PY'
+import json, os
+from pathlib import Path
+settings = json.loads(os.environ["APP_SECRET_JSON"])
+required = {"DB_NAME", "DB_USERNAME", "DB_PASSWORD", "DB_ROOT_PASSWORD"}
+if required.difference(settings): raise SystemExit("Required MariaDB settings are missing from Secrets Manager.")
+with Path("/opt/sai-mock-bank/.env").open("w", encoding="utf-8") as env_file:
+    for key in sorted(required):
+        value = str(settings[key]).replace("\\", "\\\\").replace("'", "\\'").replace("\r", "\\r").replace("\n", "\\n")
+        env_file.write(f"{key}='{value}'\n")
+PY
+unset APP_SECRET_JSON
+chmod 0600 /opt/sai-mock-bank/.env
+cat > /opt/sai-mock-bank/compose.yaml <<'COMPOSE'
+services:
+  mock-bank-db:
+    image: "${mariadb_image}"
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: $${DB_NAME}
+      MARIADB_USER: $${DB_USERNAME}
+      MARIADB_PASSWORD: $${DB_PASSWORD}
+      MARIADB_ROOT_PASSWORD: $${DB_ROOT_PASSWORD}
+    volumes:
+      - /mnt/mock-bank-database:/var/lib/mysql
+    ports:
+      - "${database_private_ip}:3306:3306"
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+COMPOSE
+cd /opt/sai-mock-bank
+docker compose up --detach

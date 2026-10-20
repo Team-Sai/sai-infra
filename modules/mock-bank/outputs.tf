@@ -4,18 +4,48 @@ output "vpc_id" {
 }
 
 output "instance_id" {
-  description = "Docker Compose를 실행하는 단일 EC2 instance ID입니다."
-  value       = aws_instance.mock_bank.id
+  description = "기존 출력 호환용 WAS EC2 instance ID입니다."
+  value       = aws_instance.was.id
 }
 
 output "private_ip" {
-  description = "VPC 피어링 API DNS에 연결된 고정 Mock Bank EC2 private IP입니다."
-  value       = aws_instance.mock_bank.private_ip
+  description = "기존 출력 호환용 사설 API DNS가 가리키는 WAS private IP입니다."
+  value       = aws_instance.was.private_ip
 }
 
 output "private_subnet_ids" {
-  description = "Mock Bank EC2가 배치되는 사설 서브넷 ID 목록입니다."
-  value       = [aws_subnet.private.id]
+  description = "Mock Bank Web, WAS, Database tier의 사설 서브넷 ID입니다."
+  value       = [aws_subnet.web.id, aws_subnet.was.id, aws_subnet.database.id]
+}
+
+output "web_instance_id" {
+  description = "CloudFront VPC Origin의 브라우저 요청을 받는 Web EC2 instance ID입니다."
+  value       = aws_instance.web.id
+}
+
+output "web_private_ip" {
+  description = "Web tier Nginx의 private IP입니다."
+  value       = aws_instance.web.private_ip
+}
+
+output "was_instance_id" {
+  description = "Spring 애플리케이션과 SAI TLS API 프록시를 실행하는 WAS EC2 instance ID입니다."
+  value       = aws_instance.was.id
+}
+
+output "was_private_ip" {
+  description = "VPC 피어링 사설 API DNS가 가리키는 WAS private IP입니다."
+  value       = aws_instance.was.private_ip
+}
+
+output "database_instance_id" {
+  description = "MariaDB와 기존 암호화 EBS 데이터 볼륨을 사용하는 Database EC2 instance ID입니다."
+  value       = aws_instance.database.id
+}
+
+output "database_private_ip" {
+  description = "WAS만 접근할 수 있는 Database private IP입니다."
+  value       = aws_instance.database.private_ip
 }
 
 output "private_api_url" {

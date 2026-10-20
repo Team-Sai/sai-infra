@@ -265,7 +265,7 @@ variable "mock_bank_api_certificate_secret_arn" {
 }
 
 variable "mock_bank_instance_type" {
-  description = "Mock Bank 단일 EC2 사양입니다. 작은 데모 기본값이며 용량·성능을 보장하지 않습니다."
+  description = "Mock Bank Web, WAS, Database EC2에 공통 적용할 사양입니다. 작은 데모 기본값이며 용량·성능을 보장하지 않습니다."
   type        = string
   default     = "t3.small"
 }

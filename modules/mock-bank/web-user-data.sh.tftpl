@@ -1,0 +1,10 @@
+#!/bin/bash
+set -euo pipefail
+
+dnf install -y nginx
+cat > /etc/nginx/conf.d/sai-mock-bank.conf <<'NGINX'
+${nginx_config}
+NGINX
+rm -f /etc/nginx/conf.d/default.conf
+nginx -t
+systemctl enable --now nginx
